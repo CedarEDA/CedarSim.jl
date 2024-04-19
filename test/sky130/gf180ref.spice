@@ -1,0 +1,11 @@
+* Inverter test
+.option scale=1
+
+X0 VDD VG 0 0 nfet_06v0 W=3.6e-07 L=6e-07
+V1 VDD 0 1.8
+Vg VG 0 sin(0.9 0.9 1e3)
+
+.LIB "jlpkg://GF180MCUPDK/sm141064.ngspice" typical
+
+.TRAN 1e-9 4.0e-7
+.END

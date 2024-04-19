@@ -1,0 +1,13 @@
+[compat]
+Catlab = "v0.14"
+
+[deps]
+Catlab = "134e5e36-593f-5add-ad60-77f754baafbe"
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
+DeepDiffs = "ab62b9b5-e342-54a8-a765-a90f495de1a6"
+GraphViz = "f526b714-d49f-11e8-06ff-31ed36ee7ee0"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+Weave = "44d3d7a6-8a23-5bf8-98c5-b353f8df5ec9"

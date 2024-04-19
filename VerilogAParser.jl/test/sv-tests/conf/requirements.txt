@@ -1,0 +1,10 @@
+pyyaml
+jinja2
+tree_sitter==0.2.2
+pygments
+yapf==0.30.0
+psutil
+mako
+make_var
+pytablewriter
+git+https://github.com/lowRISC/fusesoc.git@ot

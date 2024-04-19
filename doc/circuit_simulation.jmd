@@ -1,0 +1,429 @@
+---
+weave_options:
+  wrap: false
+---
+# Circuit Simulation
+
+We refer to CedarSim as a SPICE simulator, but what does that actually mean? What does it do? How does it work? This document is not so much about the compiler bits, but more about how to take a circuit description and turn it into differential equations. From there the differential equations get fed into DAECompiler and the SciML ecosystem, which are the focus of other documents.
+
+## History and context
+
+Making integrated circuits (ICs, chips) is hard and expensive, so you want to be able to simulate your chip before "tape out" (ICs used to be drawn on layers of literal tape that goes in the lithography machines, these days we use GDS)
+
+The original Berkeley SPICE (Simulation Program with Integrated Circuit Emphasis) was a FORTRAN program, and later C program, to simulate integrated circuits. This was back in the day of punch cards, and the syntax and code shows it. Since then there have been many literal and spiritual descendants of SPICE, such as NgSpice, Xyce, Spectre, ADS, PSpice, etc. Spectre introduced a new netlist format that's a little more well defined than SPICE, but more on that later.
+
+A SPICE file is a netlist, literally a list of nets and components, without any layout or graphical information. Just the topological connections between circuit elements, their parameters, and simulation specification. The SPICE file format sort of became the de facto standard netlist format, even though it's very quirky and each vendor has their own extensions.
+
+The original models that came with SPICE were relatively simple, but as transistors became smaller (often referred to as sub-micron) and speeds higher, more and more effects had to be modelled. Channel length, edge effects, overlap capacitances, you name it.
+
+These models are highly parametric, and these parameters are captured in Process Development Kits. The foundries, the guys with the lithography machines, have different nodes (indicated by their feature size), for which they produce a PDK that models that process. Although these days feature size is basically a lie, and a 3nm PDK doesn't really have 3nm transistors.
+
+A development that education and the industry hasn't fully caught onto yet is that
+it used to be that you could design your circuit on pen and paper with simple models and then fine tune in simulation. But as transistors became less and less like the simplified models, this has become increasingly ineffective. A good introduction into what goes into designing an IC is in [this talk](https://www.master-micro.com/analog-designers-toolbox)
+
+## Circuits
+
+Electrical circuits are governed by the Maxwell equations, but unless you're building antennas, we mostly use a lumped circuit model. What that means is that you treat electric components as discrete elements connected by ideal wires. Even when the wires get very non-ideal, this is modelled by transmission lines of discrete components. The process of extracting non-ideal wires from a GDS layout and converting them back to a lumped model is called parasitic extraction.
+
+Every circuit can be modelled as a combination of a few fundamental components. Each of these components has a characteristic equation that models the relation between the current through and the voltage across the device. (This is isomorphic to effort and flow in other domains like mechanical force and velocity)
+
+Sources
+- A current source imposes a current, has infinite resistance
+- A voltage source imposes a voltage, has zero resistance
+
+Passive elements
+- A resistors follows Ohm's law, ``V=IR``
+- A capacitor follows ``I=C\frac{dV}{dt}``
+- And inductor follows ``V=L\frac{dI}{dt}``
+
+Abstract active elements
+- Voltage controlled voltage source
+- Current controlled voltage source
+- Voltage controlled current source
+- Current controlled current source
+
+Other active elements such as BJT (Bipolar Junction Transistors), MOSFETS(Metal Oxide Semiconductor Field Effect Transistors, fet for short), and diodes can mostly be thought of as voltage controlled current sources. Although a diode can also be thought of as a nonlinear resistor, and a BJT is often analysed as a current controlled current source.
+
+For example a very simple N-channel MOSFET in saturation is modelled by ``I_D=\frac{\mu C_{ox}}{2}\frac{W}{L}\left[V_{GS}-V_{th}\right]^2``, and the P-channel is the same except with minus signs all over the place. More details on [wikipedia](https://en.wikipedia.org/wiki/MOSFET#Modes_of_operation)
+
+Two-port elements such as transformers and gyrators aren't really used in ICs, except maybe to model undesired coupling between wires.
+
+## SPICE
+
+A designer will think of a circuit in terms of a schematic diagram, like the following filter, which they will have drawn in a schematic editor rather than in code.
+
+```{julia; echo=false}
+include("circuit.jl")
+d = schemdraw.Drawing()
+d <| elm.Line().left()
+d <| elm.SourceV().up().label("V1\n5 V")
+d <| elm.Inductor().right().label("L1").dot().label("3/2 H", loc="bot")
+d <| elm.Inductor().label("L2").label("1/2 H", loc="bot")
+d <| elm.Resistor().down().label("R1\n1 Ω")
+d <| elm.Line().left().dot()
+d <| elm.Ground()
+d <| elm.Capacitor().up().label("C1\n4/3 F")
+```
+
+Let's now see how we might go about analysing and simulating this circuit. A pen and paper analysis would in this case just combine series and parallel impedances (using the Laplace [electrical impedance](https://en.wikipedia.org/wiki/Electrical_impedance) ``Z=sL``  and ``Z=\frac{1}{sC}`` instead of the differential equations) until there is nothing left and you get a [nice equation](https://en.wikipedia.org/wiki/Butterworth_filter#Example)
+
+That is however not how a SPICE simulator works, in SPICE we do [modified nodal analysis](https://en.wikipedia.org/wiki/Modified_nodal_analysis). The first step to doing this in SPICE is to convert the schematic to a netlist. In a SPICE netlist the first character on a line indicates the type of device, directly followed by its name. After that follows a list of net names that the ports of that device are connected to. And finally it may take some parameters.
+
+Lines can also start with a `*` to make a comment (great choice), or a `.` to start a command. The first line is always a comment indicating the title of the schematic. This file is often generated by a schematic editor, or written by masochists, conservatives, and simulator developers.
+
+```julia
+spice = """
+*Third order low pass filter, butterworth, fed by a sinusoidal voltage source.
+
+V1 vin 0 SIN(0, 1, 3.14)
+L1 vin n1 1.5
+C1 n1 0 1.333
+L2 n1 vout 0.5
+R1 vout 0 1
+"""
+```
+
+## Parsing
+
+Let's now look at CedarSim's parser, and try to avoid looking at the SPICE parser to prevent psychic damage. Our SPICE parser lives inside SpectreNetlistParser.jl because Spectre allows switching between languages on the fly so that you can include SPICE PDKs. Parsing of Spectre and SPICE is nearly identical so we'll just focus on SPICE here.
+
+The first step is lexing the file, in `next_token` we just go character by character and emit tokens that represent things like an identifier, operator, or a newline.
+
+```julia
+using SpectreNetlistParser: SPICENetlistParser
+using .SPICENetlistParser.SPICENetlistTokenize.Tokens
+using .SPICENetlistParser.SPICENetlistTokenize: tokenize, Tokens, kind, next_token
+
+tokenized_kinds = kind.(collect(tokenize(spice, ERROR, next_token; case_sensitive=false)))
+```
+
+As you may have noticed the smart folks at Berkeley used the same character for comments and multiplication, and they also allow plus and minus in net names (`V+`  is a net but `'V(V+)+3'` is an expression that adds 3 to the voltage of the net `V+`) So we keep track of `lexing_expression_stack` to either lex plus as an operator or as part of an identifier. Similarly `lexed_nontriv_token_line` keeps track of if we've lexed anything other than whitespace since the start of a line, which also changes the meaning of things.
+
+Next we feed that stream of tokens into the parser to turn it into an AST. For the AST we use a [red-green tree](https://ericlippert.com/2012/06/08/red-green-trees/) which can be a little bit confusing at first. But most of the time you only see the red tree and just type a bunch of `EXPR` until the compiler is happy.
+
+One thing to be really mindful of is that the tree stores offsets. This means that you have to store **every single token** in the AST in the order you lexed them in, else the offsets will be wrong and you'll get **really confusing errors!**
+
+An AST node is defined something like this, a struct with some EXPR fields.
+
+```{julia; eval=false}
+struct BinaryExpression <: AbstractASTNode
+	lhs::EXPR
+	op::EXPR{Operator}
+	rhs::EXPR
+end
+```
+
+How the parser works is that we basically make a parse state from the tokens, and call `parse_spice_toplevel` on it. What you'll frequently see is that these functions dispatch on `kind(nt(ps))` which is the kind of the next token in the parse state. The parse functions then return `EXPR(BinaryExpression(ex, op, rhs))` which eventually assembles the whole AST.
+
+```julia
+ast = SPICENetlistParser.parse(spice)
+```
+
+You can poke around a bit that indeed the AST is a red tree
+```julia
+typeof(ast)
+```
+That you can access as if it were the green tree
+```julia
+cap = ast.stmts[3]
+```
+That you can traverse upwards, and has a green tree inside where the offset, width and form reside
+```julia
+typeof(cap.parent.parent.expr.form)
+```
+
+## Code generation
+
+Now that we have an AST, we need to actually turn that into code we can simulate. You might think this is a perfect opportunity to use Symbolics.jl and ModelingToolkit.jl, and [so did we once upon a time](https://github.com/JuliaComputing/SPICEFrontend.jl). Turns out that big (4k loc) transistor models with few equations and many, many terms completely blow up Symbolics.jl. Faced with the choice of making [faster symbolics](https://github.com/JuliaComputing/SymbolicIR.jl) or directly generating Julia code, we set out on a big ongoing quest to do structural analysis, transformations, and auto differentiation on arbitrary Julia IR: [DAECompiler](https://github.com/JuliaComputing/DAECompiler.jl/) (original design proposal [here](https://github.com/JuliaComputing/SPICEFrontend.jl/blob/kf/netlists/design/netlist/netlist.md))
+
+> If all you have is a compiler everything looks like a compiler pass
+
+The type of functions consumed by DAECompiler do basically nothing under normal execution, but then use magic primitives that get analysed to actually build the system.
+
+```{julia; echo=false}
+using DAECompiler: variable, equation!, state_ddt
+```
+! @doc variable
+! @doc equation!
+! @doc state_ddt
+
+
+It's illustrative to compare what a Lorenz system looks like in DifferentialEquations, ModelingToolkit, and DAECompiler, to get a feel of what we're going for.
+
+```{julia; eval=false}
+# DifferentialEquations
+function lorenz(u, p, t)
+    σ, ρ, β = p
+    x, y, z = u
+    dx = σ * (y - x)
+    dy = x * (ρ - z) - y
+    dz = x * y - β * z
+    return [dx, dy, dz]
+end
+
+# MTK
+@parameters σ ρ β
+@variables t x(t) y(t) z(t)
+D = Differential(t)
+eqs = [D(x) ~ σ * (y - x),
+       D(y) ~ x * (ρ - z) - y,
+       D(z) ~ x * y - β * z]
+
+# DAECompiler
+struct Lorenz1{T}
+    σ::T
+    ρ::T
+    β::T
+end
+function (l::Lorenz1)()
+    x, y, z = variable.((:x, :y, :z))
+    equation!.((
+        state_ddt(x) - (l.σ * (y - x)),
+        state_ddt(y) - (x * (l.ρ - z) - y),
+        state_ddt(z) - (x * y - l.β * z)
+    ))
+end
+```
+
+The way we generate this type of code is not that complicated. `make_spectre_circuit` constructs a `SpcScope` object which keeps track of a bunch of things, and then calls it with the AST node. Method dispatch is then used to convert AST nodes to Julia or store information on the scope object. A simple example is literals
+
+```{julia; eval=false}
+function (::SpcScope)(cs::Union{SNode{SC.IntLiteral}, SNode{SP.IntLiteral}})
+    txt = String(cs)
+    Base.parse(Int64, txt)
+end
+```
+But more interesting is to study how nets and instances are handled. To trace how nets happen, look for `to_julia.nets`, to which instance creation pushes quoted `Named(net(), "name")` expressions, that just get injected into the final code. To trace how SPICE instances get made, look for `spicecall`.
+
+So let's see what that looks like for our circuit, and dig into what these functions do.
+
+```{julia; wrap=false}
+using CedarSim
+using CedarSim.SpectreEnvironment
+code = CedarSim.make_spectre_circuit(ast)
+Base.remove_linenums!(copy(code))
+```
+
+Let's get the boring parts out of the way first. `spicecall` just calls the device, but in a case-insensitive way, by using a generated function on the struct fields. `Named` calls the device but sets the DAECompiler scope to the given name, so that variables defined inside will be scoped much the same way MTK variables do scoping. If you omit `Named` you might end up with two variables named `V`, which will cause a warning.
+
+There are a bunch of macros and sweep things which we'll come back to later since they are a whole other can of worms. The interesting part happens inside `Net` and the device models that get called by `spicecall`.
+
+It is actually a bit of a lie to say we do [MNA](https://en.wikipedia.org/wiki/Modified_nodal_analysis) . Xyce has [this nice document](https://xyce.sandia.gov/files/xyce/Xyce_Math_Formulation.pdf) about their formulation and its properties, and you can see they actually assemble stuff directly in a series of matrices. What we do is more along the lines of "gather all the equations, feed them to DAECompiler", which does state selection to figure out which of these equations we actually need. It's not uncommon for us to feed 40 equations to DAECompiler and end up solving 5 of them.
+
+`Net` is basically just an alias for `IRNet` using a bunch of overlay table magic that is entirely irrelevant. `IRNet` is mostly just a struct that contains a voltage and a current to keep track of [Kirchhoff's circuit laws](https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws).
+
+```{julia; eval=false}
+mutable struct IRNet{Name<:Union{DScope,Nothing}, T}
+    name::Name
+    V::Dual{SimTag, T, 1}
+    I::T
+    function IRNet(name::Name=nothing) where Name<:Union{DScope,Nothing}
+        V = variable(name)
+        dVdt = state_ddt(V)
+        obj = new{Name, typeof(dVdt)}(name, Dual{SimTag}(V, dVdt), 0.)
+        finalizer(kcl!, obj)
+        return obj
+    end
+end
+```
+
+Here we also see the first primitives, `variable` and `state_ddt`, which are together stored in a `ForwardDiff.Dual` to propagate the derivative. The final bit of  magic is `finalizer(kcl!, obj)` which will finish up the Kirchhoff's current law (KCL) after all is said and done. It simply calls `equation!(net.I, net.name)` which indeed says that the sum of currents added to the net between its construction and deletion should be zero.
+
+So we just did step 1 of [MNA](https://en.wikipedia.org/wiki/Modified_nodal_analysis) by computing the KCL of a net in its finalizer. Next we need to do step 2 where we write down the Branch Constituent Equations, using `branch!` The basic version creates a branch current variable, adds and subtracts it from the two Net KCLs, and defines V as the voltage difference between the Nets. (this is a dual, so you also get the derivative) The second form takes a function and feeds the result into an `equation!`. It's illustrative to look at the definition of the simple resistor:
+
+```{julia; eval=false}
+function (R::SimpleResistor)(A, B)
+    branch!(A, B) do (V, I)
+        I - V/R.resistance
+    end
+end
+```
+Here you can see that we express Ohm's law in terms of `branch!`, and together these make the system of equations that we feed to DAECompiler.
+
+If you feel so inclined you could now feed the code to DAECompiler, which I'll leave as an exercise to the reader. It would be nice to inspect the generated code, but it isn't exactly short, easy to understand, or pleasant to look at, so for that head over to the DAECompiler documentation.
+
+## Spectre & Verilog-A
+
+So far we have been looking at SPICE code, but we have two other parsers. The Spectre one is pretty much identical to the SPICE one except slightly less cursed.
+
+The Verilog-A one follows a very similar structure, but Verilog is a more expressive programming language so there are just more AST forms that map to more elaborate Julia code. The most interesting ones to discuss are the derivatives and analog assignments. Let's just go through the same steps of converting a simple example to code.
+
+```julia
+using VerilogAParser
+var = """
+module BasicVAResistor(p, n);
+
+inout p, n;
+electrical p, n;
+parameter real R=1 exclude 0;
+
+analog begin
+    I(p,n) <+ V(p,n)/R;
+end
+endmodule
+"""
+va = VerilogAParser.parse(var)
+vacode = CedarSim.make_module(va)
+Base.remove_linenums!(copy(vacode))
+```
+
+And right away that's a lot more stuff going on than the SPICE example. There are the same primitives going on, but I want to draw particular attention to the `branch_state` stuff. This implements Verilog-A branch contribution semantics. For example if you have
+```verilog
+I(a, b) <+ 1
+if foo(...)
+   V(a, b) <+ 2
+```
+
+It just needs to forget about the first assignment and use the second one, but if you have repeated ones of the same kind in a row it adds.
+
+```verilog
+I(a, b) <+ 1
+V(a, b) <+ 2
+I(a, b) <+ 3
+```
+
+But then again, the following just uses the last one since the state changed.
+
+```verilog
+I(a, b) <+ 1
+V(a, b) <+ 2
+I(a, b) <+ 3
+```
+
+What's not so easy to show in a simple example is how `ddx` works. As you may imagine, `ddt` just maps to `state_ddt` or to the first partial of the Dual number if it's an expression. But `ddx` is the derivative towards some other variable. This is currently implemented in `FunctionCall` by making `V(x)` have a partial for every item in `node_order` and having `ddx` select that partial, but this will be converted to use Diffractor in the future.
+
+## Dynamic Scoping in Julia
+
+So far we have ignored that SPICE code is actually dynamically scoped. A good mental model is that everything in SPICE is text substitution, which is pretty much how NgSpice implements things. A subcircuit just gets inlined as a whole at the callsite.
+
+Consider the following SPICE code
+```julia
+spice = """
+.subckt inner a b foo=foo+2000
+R1 a b 'foo'
+.ends
+
+.subckt outer a b foo=foo+100
+x1 a b inner
+.ends
+
+.param foo = 1
+i1 vcc 0 'foo'
+x1 vcc 0 outer
+"""
+```
+The `inner` subcircuit has a parameter `foo` that depends on `foo` in the calling scope. That is, the `foo` in `outer`, which in turn uses the `foo` at the top level for a final value of `2101`. You can play around with this, adding and removing param statements at different scopes.
+
+The general way to implement this in a lexically scoped language is to track all the unresolved variables in a block of code, add them as function parameters, and pass their value from the caller. Something like the following.
+```julia
+function inner(foo)
+    println(foo)
+end
+function outer(foo)
+    inner(foo+2000)
+end
+function toplevel()
+    foo=1
+    outer(foo+100)
+end
+toplevel()
+```
+Some important things to note here: If `outer` does not itself define `foo`, it is still an unresolved variable from inner that then becomes a function parameter of `outer` regardless. In this scheme the caller needs to be aware of the variables the callee exposes, and what's more, their default value expressions!
+
+In a first pass of dynamic scoping, we kept track of the parameter expressions required to call a subcircuit in the `SpcScope` object during codegen. This worked well, but had one major limitation: How do you call a subcircuit defined in a different "compilation unit"? A major design goal of CedarSim is that we can precompile models and PDKs so that we don't spend minutes every run just compiling BSIM4 and GF180.
+
+The chosen solution to this problem is in its most basic form to define a macro `@inner` that expands to `inner(foo+2000)`, which is implemented in [DynamicScope.jl](https://github.com/JuliaComputing/DynamicScope.jl). Reality is a bit more involved, but that's the mental model for what's going on. Let's see the spice example again.
+
+```julia
+using DynamicScope
+
+@dyn function inner(foo=foo+2000)
+    @requires foo
+    println(foo)
+end
+@dyn function outer(foo=foo+100)
+    @inner()
+end
+@dyn function toplevel()
+    @provides foo
+    foo=1
+    @outer()
+end
+@toplevel()
+```
+Note the `@requires` and `@provides` macros to indicate to `@dyn` which variables a function expects from the caller, and which one it stops from bubbling up to the top. (function argument LHS are handled implicitly) `inner` implicitly provides `foo` but also requires it from its caller. `outer` requires `foo` from the expansion of `@inner`. `toplevel` `@provides` `foo` explicitly so that it does not become a parameter of `toplevel`.
+
+But most importantly, the caller doesn't require any knowledge of the callee! This is what will allow precompiling a PDK, and making dynamically scoped calls to its circuits without having to manually track which of its 800 parameters are unresolved.
+
+Let's look under the hood a bit:
+```julia
+expr = @macroexpand1 @dyn function inner(foo=foo+2000)
+    @requires foo
+    println(foo)
+end
+Base.remove_linenums!(expr)
+```
+We see that a function is generated that's stripped of its default values, and a macro that builds the call with the default expressions. Expanding that macro:
+```julia
+Base.remove_linenums!(@macroexpand1 @inner())
+```
+```julia
+Base.remove_linenums!(@macroexpand1 @inner(foo=2))
+```
+We see it outputs a new `@requires` to bubble up its parameters to the caller, which needs to `@provides` them or pass them up to the level above. We also generate a `let` block, which is needed to support parameters referring to other parameters. That is, you can't write `foo(bar=1, baz=bar+2)`, but you _can_ write `let bar=1, baz=bar+2`.
+
+## SPICE parameterization
+
+Somewhat related to "how to represent SPICE in Julia" is how to translate parameter sweeps. NgSpice allows changing just about anything, but again the correct model to think of is textual substitution and reparsing the netlist.
+
+Our strength is that we compile the netlist into optimised code, so we want to know ahead of time what is parameterised and what's actually constant. Assuming every SPICE parameter is a Julia parameter will lead to horrible performance. DAECompiler does constant propagation and anything that's a field of the parameter struct is not a constant.
+
+A naive representation of the circuit would be a nested struct, but the Julia compiler isn't designed for structs of hundreds of members, so we don't actually want to create a reified datastructure of all the parameters. It also doesn't make much sense to make a struct, and then hide it inside a `*Sim` struct so that its fields don't turn into parameters.
+
+So what we do is make a `LensSim` that takes a function and calls it with a lens. In this case lens is just fancy Haskell lingo for a nested named tuple. As we descend we shed layers of the tuple, and conceptually do `get(namedtuple, :variable, variable)` to override variables.
+
+```julia
+sweep = CedarSim.ParamLens((foo=(bar=2,),))
+sweep.foo(bar=1, boo=3)
+```
+
+## Advanced codegen
+
+With those things in mind, we can look at some more tricky bits of codegen related to dynamic scope and parameterization.
+
+```julia
+ast = SPICENetlistParser.parse(spice)
+code = CedarSim.make_spectre_circuit(ast)
+eval(code)
+CedarSim.tlshow(code)
+```
+Here we see that each (sub)circuit has generated a `@dyn` function that threads the parameters through the lens to allow overriding them. Then it contains the actual body of the subcircuit. Note that unlike models, subcircuits are not passed through `Named` and then called with nodes, but rather do everything in a single step.
+
+Inside the body it uses the same `Named` and `spicecall` stuff as before, but also performs _macro_ calls to create subcircuit instances. These macros will expand into additional `@requires` macros to propagate subcircuit parameters to the top level. We can expand this code to see that in action.
+```julia
+CedarSim.tlshow(macroexpand(@__MODULE__, code))
+```
+It's a bit unwieldy, but the interesting thing to look at is the generated `let` expressions, which propagate the parameters and lens inwards to the subcircuits.
+
+## PAQ
+
+(Potentially Asked Questions, Preemptively Answered Questions, Pepijn's Assorted Questions...)
+
+### How and why are overlay tables and CassetteOverlays used?
+
+CassetteOverlay is used in CircuitDynODESystem to override DAECompiler intrinsics and inject state into them.
+Overlay tables are used to provide simulation specific behaviour such as "simulation local storage",
+and in the future for things like topology analysis of a circuit.
+CircuitIRODESystem and CedarSim do not use CessetteOverlay.
+
+### Why do SimSpec and DefaultSim interact the way they do?
+
+The apparent overlap between DefaultSim and SimSpec parameterisation is due to DAECompiler optimisations.
+
+While SimSpec goes into the mutable SLS storage, DAECompiler does load-store optimisations on it allowing it to do constant propagation on SimSpec parameters.
+Meanwhile DefaultSim is used as problem parameters and every property it has has to be assumed editable.
+Leading to the situation where the thing you pass along with the problem is more "mutable" than the thing you can mutate within the simulation.
+
+So then in order to parameterise a circuit in an efficient way,
+you need to make sure that only the parameters you want to actually modify are part of `DefaultSim{circuit}`.
+One way to do this is to define a new sim struct type that constructs the circuit struct on the fly.

@@ -1,0 +1,8 @@
+# This file exists only to define this global environment variable
+# for all future steps.  Because we have to have at least one step,
+# we create this one to just wait upon a step that is already done.
+env:
+  BUILDKITE_PLUGIN_JULIA_VERSION: "${CEDAR_BLESSED_URL}"
+steps:
+  - wait: ~
+    depends_on: build-blessed-linux-x86_64

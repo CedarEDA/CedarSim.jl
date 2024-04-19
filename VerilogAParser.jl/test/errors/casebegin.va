@@ -1,0 +1,20 @@
+module casebegin(p, n);
+
+    analog function casebegin;
+        input x;
+        integer x;
+
+        case(x) begin
+            0: casebegin = 1;
+            1: casebegin = 2;
+        end
+        endcase
+    endfunction
+
+    inout p, n;
+    electrical p, n;
+
+    analog begin
+        I(p,n) <+ 0;
+    end
+endmodule

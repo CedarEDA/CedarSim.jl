@@ -1,0 +1,38 @@
+module nfd(p, n);
+
+    analog function integer NumFingerDiff;
+        input nf, minSD;
+        output niIntD, nuEndD, nuIntS, nuEndS;
+
+        integer minSD;
+        real nf, nuIntD, nuEndD, nuIntS, nuEndS;
+
+        analog begin
+            if ((truncInt(NF)%2) != 0) begin
+                nuEndD = 1.0
+                nuEndS = 1.0
+                nuIntD = 2.0 * max((nf - 1.0) / 2.0, 0.0);
+                nuIntS = nuIntD;
+            end else begin
+                if (minSD == 1) // minimize # of sources
+                    nuEndD = 2.0
+                    nuIntD = 2.0 * max(nf/2.0 - 1.0, 0.0);
+                    nuEndS = 0.0;
+                    nuIntS = nf;
+                else
+                    nuEndD = 0.0;
+                    nuIntD = nf;
+                    nuEndS = 2.0;
+                    nuIntS = 2.0 * max(nf/2.0 - 1.0, 0.0);
+                end
+            end
+        end
+    endfunction
+
+    inout p, n;
+    electrical p, n;
+
+    analog begin
+        I(p,n) <+ 0;
+    end
+endmodule

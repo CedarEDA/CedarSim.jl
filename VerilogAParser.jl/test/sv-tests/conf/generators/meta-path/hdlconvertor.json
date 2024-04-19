@@ -1,0 +1,16 @@
+{
+	"name": "hdlconvertor",
+	"project": "hdlconv",
+	"paths": [
+		["tests", "hdlconvertor", "tests", "sv_test", "others"],
+		["tests", "hdlconvertor", "tests", "verilog", "*"]
+	],
+	"matches": ["*.sv", "*.v"],
+	"blacklist": [
+		"aes.v",
+		"adder_implicit.sv",
+		"directive_verilogpp.sv",
+		"fifo_rx.sv",
+		"parity_using_function2.v"
+	]
+}

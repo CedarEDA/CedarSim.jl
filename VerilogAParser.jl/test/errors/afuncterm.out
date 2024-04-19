@@ -1,0 +1,13 @@
+[31m[1m╭ ERROR [VAS50]:[22m[39m[31m Incorrectly terminated Analog Function.[39m
+[31m│[39m[90m   ╭───── afuncterm.va:2[39m
+[31m│[90m2[0m  [90m│[0m     analog function integer truncInt;
+[31m│[0m   [90m┊[0m            [33m━━━━┳━━━
+[31m│[0m   [90m┊[0m [33mFunction declaration starts here[0m
+[31m│[90m3[0m  [90m│[0m         real x;
+[31m│[90m4[0m  [90m│[0m 
+[31m│[90m5[0m  [90m│[0m         truncInt = x > 0.0 ? floor(x) : ceil(x);
+[31m│[90m6[0m  [90m│[0m     end
+[31m│[0m   [90m┊[0m     [91m━┳━
+[31m│[0m   [90m┊[0m [91m✗ Incorrect Termination[0m
+[31m│[39m[90m   │[39m
+[31m│[39m[90m   ╰───── [39m

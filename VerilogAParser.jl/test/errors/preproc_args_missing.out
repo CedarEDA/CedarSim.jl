@@ -1,0 +1,9 @@
+[31m[1m╭ ERROR [VAS47]:[22m[39m[31m Expected semicolon[39m[31m.[39m
+[31m│[39m[90m  ╭───── preproc_args_missing.va:2[39m
+[31m│[90m2[0m [90m│[0m module preproc_args_missing(p, n)[91m◌ 
+[31m│[0m  [90m┊[0m                                  [32m;[0m
+[31m│[39m[90m  │[39m
+[31m│[39m[90m  ╰───── [39m Missing semicolon.
+[31m│[39m
+[31m│[0m [34mhelp:[0m The parser considered the declaration complete at the indicated location and thus expected a semicolon. If you expected the subsequent code to be part of this declaration, check for missing syntax (e.g. binary operators).
+[31m╯[39m

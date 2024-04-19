@@ -1,0 +1,189 @@
+{% if False %}
+<!-- vim: set ts=2 sts=2 sw=2 et: -->
+{% endif %}
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>SystemVerilog Report</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.css">
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/fixedheader/3.1.5/js/dataTables.fixedHeader.min.js"> </script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedheader/3.1.5/css/fixedHeader.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="report.css">
+    <script type="text/javascript" charset="utf8" src="report.js"></script>
+  </head>
+
+  <script>
+    $(document).ready( function () {
+      $('#report_table').DataTable( {
+        paging: false,
+        fixedHeader: true,
+        "order": [[ 1, "asc" ]],
+        "columnDefs": [ { "type": "sv-id", targets: 1 },
+                        { "orderable": false, targets: 0 }],
+        "columns": [
+          null,
+          null,
+          {% for tool in report %}
+          { "orderDataType": "test-status" },
+          {% endfor %}
+        ]
+      });
+    } );
+  </script>
+  <style type="text/css">
+    .report_table_result {
+      width: calc(80% / {{ report.keys()|length}} );
+    }
+  </style>
+
+  <body>
+    <h1 class="headline"><a href="https://github.com/SymbiFlow/sv-tests">SV-Tests</a></h1>
+    <p class="headline"><a href="https://github.com/SymbiFlow/sv-tests"><em>Test suite to check compliance with the SystemVerilog LRM by chapter as well as some real-world cores and test-cases.</em></a></p>
+    <table id="report_table">
+      <thead>
+        <tr class="fixed_header">
+          <th>  </th>
+          <th>  </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th title='{{ report[tool]["version"] }}'>
+            <a class="tool_link" target=_blank href='{{ report[tool]["url"] }}'>{{ tool.lower() }}</a>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+        {% for tag, info in database.items() %}
+        <tr>
+          <th class="report_table_info" title="{{info}}">
+            {% if tag in database_urls %}
+            <a class="tag_link" target=_blank href="{{database_urls[tag]}}"> {{ info }} </a>
+            {% else %}
+            {{ info }}
+            {% endif %}
+          </th>
+          <th class="report_table_tag" title="{{info}}"> {{ tag }} </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result {{ tooldata["tags"][tag]["status"] }}
+            {% if "test-na" not in tooldata["tags"][tag]["status"] %} test-cell {% endif %}"
+            {% if "test-varied" in tooldata["tags"][tag]["status"] %} style='background-size: {{'%0.0f' | format(100.0 * tooldata["tags"][tag]["passed-num"] / tooldata["tags"][tag]["logs"]|length) }}% 100%' {% endif %}
+            {% if "test-na" not in tooldata["tags"][tag]["status"] %}
+            id='{{tool}}-{{tag}}-cell'
+            onclick='toggleLog("{{tool}}", "{{tag}}",
+                               "{{tooldata["tags"][tag]["logs"][tooldata["tags"][tag]["head_test"]]["name"]}}")'
+            {% endif %}
+          >
+            {% if "test-na" not in tooldata["tags"][tag]["status"] %}
+            {{ tooldata["tags"][tag]["passed-num"] }}/{{ tooldata["tags"][tag]["logs"]|length }}
+            {% endif %}
+          </th>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      <tfoot class="report_footer">
+        <tr class="report_summary_row">
+          <th class="report_summary_header" colspan="2"> Total tests passed </th>
+
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result test-varied" style='background-size: {{'%0.0f'| format(100.0 * report[tool]["total"]["tests"] / report[tool]["tests"].keys()|length)}}% 100%;' title="{{ tool.lower() }} ({{'%0.0f'| format(100.0 * report[tool]["total"]["tests"] / report[tool]["tests"].keys()|length)}}%)" > {{ report[tool]["total"]["tests"] }}/{{ report[tool]["tests"].keys()|length }}</th>
+          {% endfor %}
+        </tr>
+        <tr class="report_summary_row">
+          <th class="report_summary_header" colspan="2"> Total tags passed </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result test-varied" style='background-size: {{'%0.0f'| format(100.0 * report[tool]["total"]["tags"] / report[tool]["total"]["tested_tags"])}}% 100%;' title="{{ tool.lower() }} ({{'%0.0f'| format(100.0 * report[tool]["total"]["tags"] / report[tool]["total"]["tested_tags"])}}%)" > {{ report[tool]["total"]["tags"]}}/{{ report[tool]["total"]["tested_tags"]}}</th>
+          {% endfor %}
+        </tr>
+        <tr class="report_summary_row">
+          <th class="report_summary_header" colspan="2"> Total time elapsed </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result" title="{{ tool.lower() }}" >
+            {{'%0.0f'| format(report[tool]["time_elapsed"])}}s </th>
+          {% endfor %}
+        </tr>
+        <tr class="report_summary_row">
+          <th class="report_table_info" colspan="2"> User time elapsed </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result" title="{{ tool.lower() }}" >
+            {{'%0.0f'| format(report[tool]["user_time"])}}s </th>
+          {% endfor %}
+        </tr>
+        <tr class="report_summary_row">
+          <th class="report_table_info" colspan="2"> System time elapsed </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result" title="{{ tool.lower() }}" >
+            {{'%0.0f'| format(report[tool]["system_time"])}}s </th>
+          {% endfor %}
+        </tr>
+        <tr class="report_summary_row">
+          <th class="report_table_info" colspan="2"> Maximum ram usage </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result" title="{{ tool.lower() }}" >
+            {{'%0.0f'| format(report[tool]["ram_usage"])}} MB </th>
+          {% endfor %}
+        </tr>
+	<tr class="report_summary_row">
+          <th class="report_table_info" colspan="2"> Average throughput passed for inputs &gt; 1KiB </th>
+          {% for tool, tooldata in report|dictsort %}
+          <th class="report_table_result" title="{{ tool.lower() }}" >
+            {{'%0.0f'| format(report[tool]["passed_throughput"]|float)}} KiB/s </th>
+          {% endfor %}
+        </tr>
+      </tfoot>
+    </table>
+    <br>
+    <a href="report.csv">Download a summary in csv</a>
+  </body>
+
+  <br> <br>
+  <footer id="footer">
+    Generated using <a href="https://github.com/SymbiFlow/sv-tests">sv-tests</a>,
+    revision: <a href="https://github.com/SymbiFlow/sv-tests/commit/{{revision}}">{{revision}}</a>.
+  </footer>
+
+  <div id="logfile-outer">
+    <div class="iframe-wrap">
+      <iframe class="iframe-log" name="log-frame"></iframe>
+    </div>
+    <div class="iframe-wrap">
+      <iframe class="iframe-log" name="file-frame"></iframe>
+    </div>
+    {% for tag, info in database.items() %}
+    {% for tool, tooldata in report.items() %}
+    {% if "test-na" not in tooldata["tags"][tag]["status"] %}
+    <div class="logfile"
+         id="{{ tool }}-{{ tag }}-logfile">
+      <div class="logtab-bar"
+           id="logtab-{{tool}}-{{tag}}-bar">
+        <button class="logtab-btn logtab-close-btn"
+                onclick='toggleLog("{{tool}}", "{{tag}}", null)'>
+          close
+        </button>
+        {% for test, output in tooldata["tags"][tag]["logs_sorted"] %}
+        <button class="logtab-btn
+                       logtab-tab-btn
+                       {{output["status"]}}
+                sorted
+                "
+                onclick='selectTab("{{output["fname"]}}",
+                                   "logtab-btn-{{tool}}-{{tag}}-{{output["name"]}}",
+                                   "{{output["first_file"]}}",
+                                   "{{output["name"]}}")',
+                id="logtab-btn-{{tool}}-{{tag}}-{{output['name']}}"
+        >
+          {{ output["name"] }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endfor %}
+  </div>
+
+</html>

@@ -1,0 +1,61 @@
+steps:
+  - group: ":evergreen_tree: :electron: :julia: Build Cedar-blessed"
+    notify:
+      - github_commit_status:
+          context: "Build blessed"
+    steps:
+      - label: ":julia: :linux: Build Julia"
+        key: build-blessed-linux-x86_64
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+          BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
+        plugins:
+          - JuliaCI/julia#v1:
+              version: "1"
+          - staticfloat/sandbox#v1:
+              rootfs_url: https://github.com/JuliaCI/rootfs-images/releases/download/v5.22/aws_uploader.x86_64.tar.gz
+              rootfs_treehash: "486b8618fd0184dd869c9282a73bb08aa1411e82"
+              uid: 1000
+              gid: 1000
+              workspaces:
+                - "/cache:/cache"
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - staticfloat/cryptic#v2:
+              variables:
+                - AWS_ACCESS_KEY_ID="U2FsdGVkX1+hBThvdTT6Zq/FiRocTXSNUt/C2L7v+N5b9qKfj4cQ5NjZbUSrQyvc"
+                - AWS_SECRET_ACCESS_KEY="U2FsdGVkX19YFg+1mA14oNm0OK9CVKsNHorX6rYpdjBAY40RZJPmE65UsrpZjYox+Y7RDRzco6DRNAAHByMzvg=="
+        agents:
+          os: "linux"
+          arch: "x86_64"
+        commands: |
+          julia --project=contrib/julia_build -e 'import Pkg; Pkg.instantiate()'
+          julia --project=contrib/julia_build contrib/julia_build/ci_build.jl
+        concurrency: 1
+        concurrency_group: 'cedarsim/linux_blessed_deploy'
+
+      - label: ":julia: :mac: Build Julia"
+        key: build-blessed-macos-aarch64
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+          BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
+        plugins:
+          - JuliaCI/julia#v1:
+              version: "1"
+          - staticfloat/ssh-agent#sf/launchctl_workaround:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - staticfloat/cryptic#v2:
+              variables:
+                - AWS_ACCESS_KEY_ID="U2FsdGVkX1+hBThvdTT6Zq/FiRocTXSNUt/C2L7v+N5b9qKfj4cQ5NjZbUSrQyvc"
+                - AWS_SECRET_ACCESS_KEY="U2FsdGVkX19YFg+1mA14oNm0OK9CVKsNHorX6rYpdjBAY40RZJPmE65UsrpZjYox+Y7RDRzco6DRNAAHByMzvg=="
+        agents:
+          os: "macos"
+          arch: "aarch64"
+          queue: "default"
+        commands: |
+          julia --project=contrib/julia_build -e 'import Pkg; Pkg.instantiate()'
+          julia --project=contrib/julia_build contrib/julia_build/ci_build.jl
+        concurrency: 1
+        concurrency_group: 'cedarsim/linux_blessed_deploy'

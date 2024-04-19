@@ -1,0 +1,26 @@
+module unterm_analog_block(x);
+    analog begin
+        // ************************************************
+        // *      Geometry dependent calculations         *
+        // ************************************************
+        begin : B4BiasIndepCalc
+            devsign = TYPE;
+            Temp = $temperature;
+
+            if (MTRLMOD == 0)
+                if ($param_given(TOXE) && $param_given(TOXP) && $param_given(DTOX) &&
+                        TOXE != TOXP + DTOX)
+                    $strobe("Warning: toxe, toxp and dtox all given and toxe != toxp + dtox; dtox ignored");
+                else if ($param_given(TOXE) && !$param_given(TOXP))
+                    TOXP = TOXE - DTOX;
+                else if (!$param_given(TOXE) && $param_given(TOXP)) begin
+                    TOXE = TOXP + DTOX;
+                    if (!$param_given(TOXM)) // 4.7
+                        TOXM = TOXE;
+                    end
+                end
+            else
+                $strobe("Error");
+        end
+    end
+endmodule

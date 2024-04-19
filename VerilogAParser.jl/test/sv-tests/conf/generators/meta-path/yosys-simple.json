@@ -1,0 +1,9 @@
+{
+	"name": "simple",
+	"project": "yosys",
+	"paths": [
+		["tools", "yosys", "tests", "simple"]
+	],
+	"matches": ["*.v"],
+	"blacklist": ["hierdefparam.v", "memory.v", "values.v", "func_width_scope.v", "named_genblk.v"]
+}

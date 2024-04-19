@@ -1,0 +1,24 @@
+name = "VerilogAParser"
+uuid = "b333aca1-b97d-47c9-9908-8e5a8c115e58"
+authors = ["JuliaHub, Inc. and other contributors"]
+version = "0.3.0"
+
+[workspace]
+projects = ["docs"]
+
+[deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
+Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+Lexers = "8fc43420-9e17-4e89-a998-f4e9593a1dfc"
+SnoopPrecompile = "66db9d55-30c0-4569-8b51-7e840670fc0c"
+VT100 = "7774df62-37c0-5c21-b34d-f6d7f98f54bc"
+
+[compat]
+AbstractTrees = "v0.4.1"
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

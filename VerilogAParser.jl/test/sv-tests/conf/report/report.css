@@ -1,0 +1,214 @@
+body {
+  font-family: sans-serif;
+}
+
+.headline {
+    text-align: center;
+}
+
+.headline a {  /* Only subtly hint that this is a link */
+    color: #00006f;
+    text-decoration: none;
+}
+
+.fixed_header {
+  height: 150px;
+}
+
+table.dataTable thead .sorting, table.dataTable thead .sorting_asc, 
+table.dataTable thead .sorting_desc, table.dataTable thead .sorting_asc_disabled, 
+table.dataTable thead .sorting_desc_disabled {
+  background-position: bottom right;
+  max-width: 50px;
+}
+
+.tool_link {
+  display: block;
+  transform: translate(0px, 30px) rotate(315deg);
+}
+
+table.dataTable {
+  width: auto;
+  table-layout: fixed;
+}
+
+table.dataTable tfoot th {
+  padding: 10px 10px 6px 10px;
+  border-top: 0px;
+}
+
+.report_footer {
+  outline: 2px solid #505050;
+}
+
+.report_table_tag {
+  text-align: left;
+  width: 8em;
+}
+
+.report_table_info {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  overflow: hidden;
+  width: 30em;
+  max-width: 30em;
+}
+
+.tag_link, .tool_link {
+  color: black;
+}
+
+tfoot .report_table_result {
+  font-weight: normal !important;
+  text-align: right;
+  border: 1px;
+  border-color: #505050;
+  border-style: none none solid solid;
+}
+
+.report_summary_row {
+  background-color: lightgray;
+}
+
+.report_summary_header {
+  text-align: right;
+}
+
+.ui-widget-shadow {
+  -webkit-box-shadow: none;
+  box-shadow: none;
+}
+
+.ui-tooltip {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 13px;
+  font-weight: normal;
+  white-space: pre-wrap;
+  max-width: 100%;
+}
+
+.ui-corner-all {
+  border-radius: 0px;
+}
+
+.test-cell {
+  border: 1px;
+  border-color: #505050;
+  border-style: dotted;
+  cursor: pointer;
+
+  font-family: "Courier New", Courier, monospace;
+  font-weight: normal;
+}
+
+.test-cell-selected {
+  outline: 3px solid blue;
+  filter: brightness(95%);
+  font-weight: bold;
+}
+
+.test-failed {
+  background-color: #ff6961;
+}
+.test-passed {
+  background-color: #89E894;
+}
+.test-varied {
+  background-color: #ff6961;
+  /* a single green pixel with color #89e894 that we use to make a variable background 'bargraph' */
+  background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVQI12PoejEFAAQGAgeVHl+AAAAAAElFTkSuQmCC');
+  background-repeat:no-repeat;
+  background-size: 100% 100%;
+}
+.test-na {
+  background-color: #cfcece;
+}
+
+#logfile-outer {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 1.5%;
+  width: 97%;
+  max-height: 80%;
+  border: 2px solid black;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  z-index: 10;
+  font-family: "Courier New", Courier, monospace;
+  background-color: #fff;
+}
+.logfile {
+  display: none;
+  max-height: 20%;
+  border: 2px solid black;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  z-index: 10;
+  font-family: "Courier New", Courier, monospace;
+  background-color: #666;
+}
+.logfile-inner {
+  overflow-y: scroll;
+  overflow-x: hidden;
+  max-height: calc(60vh);
+  border-bottom: 1px solid black;
+  display: none;
+  cursor: text;
+}
+.iframe-log {
+  width: 100%;
+  height: calc(20vh);
+}
+.iframe-wrap {
+  width: 50%;
+  float: left;
+  box-sizing: border-box;
+}
+.logtab-bar {
+  overflow-y: scroll;
+  max-height: calc(20vh);
+}
+.logtab-btn {
+  margin: 0px;
+  cursor: pointer;
+  border: 2px solid #666;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  width: 12.5%;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.logtab-close-btn {
+  background: #cfcece;
+  float: right;
+}
+.logtab-tab-btn {
+  float: left;
+}
+.logtab-btn-selected {
+  border: 2px solid blue;
+  font-weight: bold;
+}
+.logfile-tab {
+  z-index: 11;
+  float: left;
+  cursor: pointer;
+}
+.logfile-shown {
+  display: block;
+}
+.logfile-outer-shown {
+  display: block !important;
+}
+.logtab-shown {
+  display: block;
+}
+
+button:focus {outline:0;}
+
+footer {
+  text-align: center;
+  font-size: 10px;
+}

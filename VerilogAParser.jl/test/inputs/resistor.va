@@ -1,0 +1,10 @@
+    module BasicVAResistor(p, n); // N.B.: Whitespace at the beginning of this line is part of the test
+
+inout p, n;
+electrical p, n;
+parameter real R=1 exclude 0;
+
+analog begin
+    I(p,n) <+ V(p,n)/R;
+end
+endmodule

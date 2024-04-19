@@ -1,0 +1,112 @@
+module pag(p, n);
+
+    analog function integer PAeffGEO;
+        input nf, geo, minSD, Weffcj, DMCG, DMCI, DMDG;
+        output Ps, Pd, As, Ad;
+
+        integer geo, minSD;
+        real Weffcj, DMCG, DMCI, DMDG, Ps, Pd, As, Ad;
+
+        begin
+            if (geo < 9)
+                NumFingerDiff(nf, minSD, niIntD, nuEndD, nuIntS, nuEndS);
+
+            T0 = DMCG + DMCI;
+            T1 = DMCG + DMCG;
+            T2 = DMDG + DMDG;
+
+            PSiso = T0 + T0 + Weffcj;
+            PDiso = PSiso;
+            PSsha = T1;
+            PDsha = T1;
+            PSmer = T2;
+            PDmer = T2;
+
+            ASiso = T0 * Weffcj;
+            ADiso = T0 * Weffcj;
+
+            ASsha = DMCG * Weffcj;
+            ADsha = DMCG * Weffcj;
+
+            ASmer = DMDG * Weffcj;
+            ADmer = DMDG * Weffcj;
+
+            case(geo) begin
+                0: begin
+                    Ps = nuEndS * PSiso + nuIntS * PSsha;
+                    Pd = nuEndD * PDiso + nuIntD * PDsha;
+                    As = nuEndS * ASiso + nuIntS * ASsha;
+                    Ad = nuEndD * ADiso + nuIntD * ADsha;
+                end
+                1: begin
+                    Ps = nuEndS + PSiso + nuIntS * PSsha;
+                    Pd = (nuEndD + PDiso) + nuIntD * PDsha;
+                    As = nuEndS * ASiso + nuIntS * ASsha;
+                    Ad = (nuEndD + nuIntD) * ADsha;
+                end;
+                2: begin
+                    Ps = (nuEndS + nuIntS) * PSsha;
+                    Pd = nuEndD * PDiso + nuIntD * PDsha;
+                    As = (nuEndS + nuIntS) * ASsha;
+                    Ad = nuEndD * ADiso + nuIntD * ADsha;
+                end;
+                3: begin
+                    Ps = (nuEndS + nuIntS) * PSsha;
+                    Pd = (nuEndD + nuIntD) * PDsha;
+                    As = (nuEndS + nuIntS) * ASsha;
+                    Ad = (nuEndD + nuIntD) * ADsha;
+                end
+                4: begin
+                    Ps = nuEndS * PSiso + nuIntS * PSsha;
+                    Pd = nuEndD * PDmer + nuIntD * PDsha;
+                    As = nuEndS * ASiso + nuIntS * ASsha;
+                    Ad = nuEndD * ADmer + nuIntD * ADsha;
+                end
+                5: begin
+                    Ps = (nuEndS + nuIntS) * PSsha;
+                    Pd = nuEndD * PDmer + nuIntD * PDsha;
+                    As = (nuEndS + nuIntS) * ASsha;
+                    Ad = nuEndD * ADmer + nuIntD * ADsha;
+                end
+                6: begin
+                    Ps = nuEndS * PSmer + nuIntS * PSsha;
+                    Pd = nuEndD * PDiso + nuIntD * PDsha;
+                    As = nuEndS * ASmer + nuIntS * ASsha;
+                    Ad = nuEndD * ADiso + nuIntD * ADsha;
+                end
+                7: begin
+                    Ps = nuEndS * PSmer + nuIntS * PSsha;
+                    Pd = (nuEndD + nuIntD) * PDsha;
+                    As = nuEndS * ASmer + nuIntS * ASsha;
+                    Ad = (nuEndD + nuIntD) * ADsha;
+                end
+                8: begin
+                    Ps = nuEndS * PSmer + nuIntS * PSsha;
+                    Pd = nuEndD * PDmer + nuIntD * PDsha;
+                    As = nuEndS * ASmer + nuIntS * ASsha;
+                    Ad = nuEndD * ADmer + nuIntD * ADsha;
+                end
+                9: begin /* geo = 9 and 10 happen only when nf = even */
+                    Ps = PSiso + (nf - 1.0) * PSsha;
+                    Pd = nf * PDsha;
+                    As = ASiso + (nf - 1.0) * ASsha;
+                    Ad = nf * ADsha;
+                end
+                10: begin
+                    Ps = nf * PSsha;
+                    Pd = PDiso + (nf - 1.0) * PDsha;
+                    As = nf * ASsha;
+                    Ad = ADiso + (nf - 1.0) * ADsha;
+                end
+                default: $strobe("Warning: Specified GEO = ", geo, " not matched");
+            endcase
+        end
+    end
+
+    inout p, n;
+    electrical p, n;
+
+    analog begin
+        I(p,n) <+ 0;
+    end
+endmodule

@@ -1,0 +1,4 @@
+// This first line is a comment
+simulator lang=spice
+* HSPICE uses MEG for 1e6 and M or m for 1e-3
+.param mega=1MEG milli=1M one='mega*milli'

@@ -1,0 +1,36 @@
+
+`include "constants.vams"
+`define N_MINLOG          1e-38       /* the smallest number we can take the log of */
+
+module error_with_macros(a)
+    analog function real Eval1ovFNoise;
+        input Vds, leff, vsattemp, Vdseff, Vgsteff, litl, cd, ueff, Abulk;
+        real Vds, leff, vsattemp, Vdseff, Vgsteff, litl, cd, ueff, Abulk;
+
+        begin
+            Leff = leff - 2.0 * LINTNOI;
+            Leffsq = Leff * Leff;
+            esat = 2.0 * vsattemp / ueff;
+            if (EM <= 0.0) DelClm = 0.0;
+            else begin
+                T0 = ((Vds - Vdseff) / litl + EM) / esat;
+                DelClm = litl * log(max(T0, `N_MINLOG));
+                if (DelClm < 0.0) DelClm = 0.0;
+            end
+            T1 = `P_Q * `P_Q * P_K * cd * $temperature * ueff;
+            T2 = 1.0e10 * Abulk * COXE * LeffSq;
+            N0 = COXE * Vgsteff / `P_Q;
+            Nl = COXE * Vgsteff * (1.0 - AbovVgst2Vtm * Vdseff) / `P_Q;
+
+            T3 = TNOIA * log(max((N0 + nstar)/(Nl + nstar), `N_MINLOG));
+            T4 = TNOIB * (N0 - Nl);
+            T5 = TNOIC * 0.5 * (N0 * N0 - Nl * Nl);
+
+            T6 = `P_Q * $temperature * cd * cd;
+            T7 = 1.0e10 * EffFreq * Leffsq * weff * NF;
+            T8 = TNOIA + TNOIB * Nl + TNOIC * Nl * Nl;
+            T9 = (Nl + nstar) * (Nl + nstar);
+            Eval1ovFNoise = T1 / T2 * (T3 + T4 + T5) + T6 / T7 * DelClm * T8 / T9;
+        end
+    end
+endmodule

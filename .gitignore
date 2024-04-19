@@ -1,0 +1,8 @@
+.vscode/
+LocalPreferences.toml
+test/plots/
+test/ir/
+test/ir.tar.gz
+ir/
+docs/Manifest.toml
+docs/build

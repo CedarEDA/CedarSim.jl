@@ -1,0 +1,5 @@
+module ptr_deref(p, n);
+    analog begin
+        p=MTRLMOD->x;
+    end
+endmodule

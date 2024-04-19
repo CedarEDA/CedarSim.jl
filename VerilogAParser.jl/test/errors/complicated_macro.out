@@ -1,0 +1,27 @@
+[31m[1m╭ ERROR [VAS46]:[22m[39m[31m Unexpected semicolon.[39m
+[31m│[39m[90m   ╭───── complicated_macro.va:54[39m
+[31m│[90m54[0m [90m│[0m         `DIMOD(cbs,S)
+[31m│[39m[90m   ├───── Using macro [39m[92m`DIMOD[39m[90m at complicated_macro.va:4[39m
+[31m│[90m4[0m  [90m│[0m `define DIMOD(cb, SD)                                                      \
+[31m│[90m5[0m  [90m│[0m     Nvtm = VTM * NJ``SD;                                                   \
+[31m│[39m[90m   ├───── Expanded to[39m
+[31m│[90m54[0m [90m│[0m [92m    Nvtm = VTM * NJ``[0mS[92m;                                                   [0m
+[31m│[90m↔[0m  [90m│[0m [92m    if (A``[0mS[92m``EFF <= 0.0 && P``[0mS[92m``EFF <= 0.0)                            [0m
+[31m│[90m↔[0m  [90m│[0m [92m        SatCurrent = 0.0;                                                  [0m
+[31m│[90m↔[0m  [90m│[0m [92m    else                                                                   [0m
+[31m│[90m↔[0m  [90m│[0m [92m        SatCurrent = A``[0mS[92m``EFF * [0mS[92m``jctTempSatCurDensity +               [0m
+[31m│[90m↔[0m  [90m│[0m [92m            P``[0mS[92m``EFF * [0mS[92m``jctSidewallTempSatCurDensity +                [0m
+[31m│[90m↔[0m  [90m│[0m [92m            WEFFCJ * NF * [0mS[92m``jctGateSidewallTempSatCurDensity;            [0m
+[31m│[90m↔[0m  [90m│[0m [92m                                                                           [0m
+[31m│[90m↔[0m  [90m│[0m [92m    if (SatCurrent <= 0.0)                                                 [0m
+[31m│[90m↔[0m  [90m│[0m [92m        [0mcbs[92m = `GMIN * vjct;                                                 [0m
+[31m│[90m↔[0m  [90m│[0m [92m    else case (DIOMOD)                                                     [0m
+[31m│[90m↔[0m  [90m│[0m [92m        0: begin                                                           [0m
+[31m│[90m↔[0m  [90m│[0m [92m            evb = exp(vjct / Nvtm);                                        [0m
+[31m│[90m↔[0m  [90m│[0m [92m            T1 = XJVB``[0mS[92m * exp(-(BV``[0mS[92m + vjct) / Nvtm);                  [0m
+[31m│[90m↔[0m  [90m│[0m [92m            [0mcbs[92m = SatCurrent * (XExpBV``[0mS[92m - T1 - 1.0) + `GMIN * vjct;      [0m
+[31m│[90m↔[0m  [90m│[0m [92m        end[91m;[92m                                                               
+[31m│[0m   [90m┊[0m            [91m┓
+[31m│[0m   [90m┊[0m [91m✗ Unexpected semicolon[0m
+[31m│[39m[90m   │[39m
+[31m│[39m[90m   ╰───── [39mUnexpected semicolon.

@@ -1,0 +1,22 @@
+module missing_assignment(p, n);
+
+    analog function integer PAeffGEO;
+        input nf, geo, minSD, Weffcj, DMCG, DMCI, DMDG;
+        output Ps, Pd, As, Ad;
+
+        integer geo, minSD;
+        real Weffcj, DMCG, DMCI, DMDG, Ps, Pd, As, Ad;
+
+        begin
+            if (geo < 9)
+                NumFingerDiff(nf, minSD, niIntD, nuEndD, nuIntS, nuEndS);
+        end
+    endfunction
+
+    inout p, n;
+    electrical p, n;
+
+    analog begin
+        I(p,n) <+ 0;
+    end
+endmodule

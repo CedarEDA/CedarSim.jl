@@ -1,0 +1,6 @@
+[deps]
+AWS = "fbe9abb3-538b-5e4e-ba9e-bc94f4f92ebc"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+TreeArchival = "216c6a2e-6c61-7669-6863-726165657274"
+VerilogAParser = "b333aca1-b97d-47c9-9908-8e5a8c115e58"

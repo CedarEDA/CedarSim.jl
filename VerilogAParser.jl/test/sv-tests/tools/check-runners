@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020 The SymbiFlow Authors.
+#
+# Use of this source code is governed by a ISC-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/ISC
+#
+# SPDX-License-Identifier: ISC
+
+import os
+import sys
+import argparse
+import logging
+
+from importlib import import_module
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("runners", metavar='runner', type=str, nargs='+')
+parser.add_argument("--filter", type=str, nargs='*')
+
+args = parser.parse_args()
+logger = logging.getLogger()
+
+runner_obj = None
+
+runners_ok = []
+
+if 'RUNNERS_DIR' in os.environ:
+    sys.path.insert(1, os.path.abspath(os.environ['RUNNERS_DIR']))
+
+if args.filter is not None:
+    runners = set(args.runners) & set(args.filter)
+else:
+    runners = set(args.runners)
+
+runners = list(sorted(runners))
+
+for runner in runners:
+    try:
+        module = import_module(runner)
+        runner_cls = getattr(module, runner)
+        runner_obj = runner_cls()
+    except Exception:
+        continue
+
+    new_path = [
+        os.path.abspath(os.environ['OUT_DIR'] + "/runners/bin/"),
+        os.environ['PATH']
+    ]
+
+    os.environ['PATH'] = ":".join(new_path)
+
+    if runner_obj.can_run():
+        print(runner)
+    else:
+        logger.debug('Runner {} not found'.format(runner))

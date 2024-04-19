@@ -1,0 +1,62 @@
+steps:
+  - group: ":book: Docs"
+    notify:
+      - github_commit_status:
+          context: "Docs"
+    steps:
+      - label: ":book: CedarSim documentation"
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+          BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - JuliaCI/julia#v1:
+              version: "https://jc-cedarsim-juliabuilds.s3.amazonaws.com/vanilla/julia-latest-linux-x86_64.tar.gz"
+          - JuliaCI/julia-test#v1:
+              use_ssh: true
+              run_tests: false
+              extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+        commands: |
+          export DOCUMENTER_KEY=$${GITHUB_SSH_KEY}
+          echo "+++ Building docs..."
+          julia --project=docs -e 'import Pkg; Pkg.instantiate(); Pkg.precompile()'
+          julia --project=docs docs/make.jl
+        if: build.message !~ /\[skip docs build\]/
+        concurrency: 1
+        concurrency_group: 'cedarsim/docs_deploy'
+        timeout_in_minutes: 120
+        agents:
+          os: "linux"
+          arch: "x86_64"
+
+      - label: ":book: {{matrix}} documentation"
+        matrix:
+          - "SpectreNetlistParser.jl"
+          - "VerilogAParser.jl"
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+          BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - JuliaCI/julia#v1:
+              version: "https://jc-cedarsim-juliabuilds.s3.amazonaws.com/vanilla/julia-latest-linux-x86_64.tar.gz"
+          - JuliaCI/julia-test#v1:
+              use_ssh: true
+              run_tests: false
+              extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+        commands: |
+          export DOCUMENTER_KEY=$${GITHUB_SSH_KEY}
+          echo "+++ Building docs..."
+          julia --project={{matrix}}/docs -e 'import Pkg; Pkg.instantiate(); Pkg.precompile()'
+          julia --project={{matrix}}/docs {{matrix}}/docs/make.jl
+        if: build.message !~ /\[skip docs build\]/
+        concurrency: 1
+        concurrency_group: 'cedarsim/docs_deploy'
+        timeout_in_minutes: 120
+        agents:
+          os: "linux"
+          arch: "x86_64"

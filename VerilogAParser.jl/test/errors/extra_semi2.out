@@ -1,0 +1,14 @@
+[31m[1m╭ ERROR [VAS46]:[22m[39m[31m Unexpected semicolon.[39m
+[31m│[39m[90m   ╭───── extra_semi2.va:9[39m
+[31m│[90m9[0m  [90m│[0m         begin
+[31m│[90m10[0m [90m│[0m             if (x > `EXP_THRESHOLD)
+[31m│[90m11[0m [90m│[0m                 expclamp = `MAX_EXP;
+[31m│[90m12[0m [90m│[0m             else if (x < `EXP_THRESHOLD)
+[31m│[90m13[0m [90m│[0m                 expclamp = `MIN_EXP;
+[31m│[90m14[0m [90m│[0m             else
+[31m│[90m15[0m [90m│[0m                 expclamp = exp(x);
+[31m│[90m16[0m [90m│[0m         end[91m;
+[31m│[0m   [90m┊[0m            [91m┓
+[31m│[0m   [90m┊[0m [91m✗ Unexpected semicolon[0m
+[31m│[39m[90m   │[39m
+[31m│[39m[90m   ╰───── [39mUnexpected semicolon.

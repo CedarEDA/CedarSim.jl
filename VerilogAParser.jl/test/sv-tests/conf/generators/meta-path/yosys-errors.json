@@ -1,0 +1,10 @@
+{
+	"name": "errors",
+	"project": "yosys",
+	"should_fail_because": "this test imported from yosys repository contains intentional syntax error",
+	"paths": [
+		["tools", "yosys", "tests", "errors"]
+	],
+	"matches": ["*.v"],
+	"blacklist": ["syntax_err06.v", "syntax_err09.v", "syntax_err12.v", "syntax_err13.v"]
+}

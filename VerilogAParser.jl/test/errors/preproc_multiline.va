@@ -1,0 +1,5 @@
+`define MPRco(nam,def,uni,lwr,upr,des) (*units=uni, desc=des*) parameter real nam=def from[lwr:upr) ;
+module preproc_multiline(p, n);
+    `MPRco( VBX           , PHI - 7.7348e-4*NDEP * XT * XT
+                                           ,"V"        ,0           ,inf,        ,"Vbs at which the depletion region width equals XT")
+endmodule

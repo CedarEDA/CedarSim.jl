@@ -1,0 +1,135 @@
+name: sv-tests-ci
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  Test:
+    name: "Code Quality Checks"
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - name: Script
+        run:
+          pip install -r conf/requirements.txt
+      - name: Make
+        run:
+          make format
+      - name: Test
+        run:
+          test $(git status --porcelain | wc -l) -eq 0 || { git diff; false; }
+      - name: Clone submodules
+        run:
+          ./.github/add-local-submodules.sh "$GITHUB_REPOSITORY"
+      - name: License
+        uses: SymbiFlow/actions/checks@main
+        with:
+          exclude_directory: |
+            ./.git/
+            ./.github/
+            ./.dependabot/
+            ./miniconda.sh
+            ./build/
+          third_party: |
+            ./third_party/cores/
+            ./third_party/tests/
+            ./third_party/tools/
+
+  Run:
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - { JOB_NAME: iverilog, MAKEFLAGS: -j2 }
+          - { JOB_NAME: moore, MAKEFLAGS: -j2 }
+          - { JOB_NAME: odin_ii, MAKEFLAGS: -j2 }
+          - { JOB_NAME: slang, MAKEFLAGS: -j2 }
+          - { JOB_NAME: sv-parser, MAKEFLAGS: -j2 }
+          - { JOB_NAME: surelog, MAKEFLAGS: -j2 }
+          - { JOB_NAME: tree-sitter-verilog, MAKEFLAGS: -j2 }
+          - { JOB_NAME: yosys, MAKEFLAGS: -j2 }
+          - { JOB_NAME: antmicro-yosys-complete, MAKEFLAGS: -j2 }
+          - { JOB_NAME: verible, MAKEFLAGS: -j2 }
+          - { JOB_NAME: verilator, MAKEFLAGS: -j2 }
+          - { JOB_NAME: uhdm-integration-verilator, MAKEFLAGS: -j2 RUNNERS_FILTER=UhdmVerilator }
+          - { JOB_NAME: uhdm-integration-yosys, MAKEFLAGS: -j2 RUNNERS_FILTER=UhdmYosys }
+          - { JOB_NAME: zachjs-sv2v, MAKEFLAGS: -j2 }
+
+    name: ${{ matrix.env.JOB_NAME }}
+    env: ${{ matrix.env }}
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - name: Install
+        run:
+          ./.github/workflows/install.sh ${{ matrix.env.MAKEFLAGS }}
+      - name: Run
+        run:
+          ./.github/workflows/run.sh ${{ matrix.env.MAKEFLAGS }}
+      - name: Prepare Report
+        run:
+          ./.github/workflows/tool_report_prepare.sh
+      - uses: actions/upload-artifact@v2
+        with:
+          name: report_${{ matrix.env.JOB_NAME }}
+          path: |
+            ./out/report/${{ matrix.env.JOB_NAME }}_report.csv
+
+  Summary:
+    name: Summary
+    runs-on: ubuntu-18.04
+    needs: Run
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - name: Prepare output directories
+        run: mkdir -p out/report
+      - uses: actions/download-artifact@v2
+        with:
+          path: ./out/
+      - name: Summary
+        run:
+          ./.github/workflows/summary.sh
+      - name: Save PR number
+        run: |
+          echo ${{ github.event.number }} > ./out/report/issue_num
+      - uses: actions/upload-artifact@v2
+        with:
+          name: tests_summary
+          path: |
+            ./out/report/tests_summary.json
+            ./out/report/tests_summary.md
+            ./out/report/tests_report.csv
+            ./out/report/base_report.csv
+            ./out/report/issue_num
+            ./out/report/new_passes.csv
+            ./out/report/new_failures.csv
+      - id: get-artifacts-to-delete
+        run: |
+          artifacts=$(find ./out -type d -name 'report_*' -exec basename {} \;)
+          echo $artifacts
+          artifacts="${artifacts//'%'/'%25'}"
+          artifacts="${artifacts//$'\n'/'%0A'}"
+          artifacts="${artifacts//$'\r'/'%0D'}"
+          echo ::set-output name=artifacts::$artifacts
+          echo $artifacts
+      - name: Delete Old Artifacts
+        uses: geekyeggo/delete-artifact@v1
+        with:
+          name: ${{ steps.get-artifacts-to-delete.outputs.artifacts }}

@@ -1,0 +1,7 @@
+module if_missing_paren(p, n);
+    analog begin
+        if MTRLMOD == 0) begin
+
+        end
+    end
+endmodule

@@ -1,0 +1,198 @@
+# An introduction to Julia's Core.Compiler.
+
+## Julia's representation of code: [SSA IR](https://en.wikipedia.org/wiki/Static_single-assignment_form)
+Julia uses a static single assignment intermediate representation ([SSA IR](https://en.wikipedia.org/wiki/Static_single-assignment_form)) to perform optimization.
+The SSA part means that in the IR, every variable is assigned to exactly once and this definition occurs before all uses of the variable. The transformation to IR (SSA conversion only happens after inference) is performed by code lowering, and in this representation there are a few changes worth highlighting.
+
+1. Basic blocks (regions with no control flow) are explicitly annotated.
+2. if/else and loops are turned into `goto` statements.
+3. lines with multiple operations are split into multiple lines by introducing variables.
+
+For example the following Julia code:
+```julia
+function foo(x)
+    y = sin(x)
+    if x > 5.0
+        y = y + cos(x)
+    end
+    return exp(2) + y
+end
+```
+when called with a `Float64` argument is translated into:
+
+```julia
+using InteractiveUtils
+@code_typed foo(1.0)
+```
+
+In this example, we can see all of these changes.
+1. The first basic block is everything in
+```llvm
+1 ─ %1 = invoke Main.sin(x::Float64)::Float64
+│   %2 = Base.lt_float(x, 5.0)::Bool
+└──      goto #3 if not %2
+```
+2. The `if` statement is translated into `goto #3 if not %2` which goes to the 3rd basic block if `x>5` isn't met and otherwise goes to the second basic block.
+3. `%2` is a variable introduced to represent `x > 5`.
+
+### [Lattices](https://en.wikipedia.org/wiki/Lattice_(order))
+```{julia; echo = false}
+using Catlab, Catlab.Graphs, Catlab.Graphics, Catlab.CategoricalAlgebra
+using GraphViz
+
+@acset_type IndexedLabeledGraph(SchLabeledGraph, index=[:src, :tgt, :label],
+    unique_index=[:label]) <: AbstractLabeledGraph
+add_ledge!(ig::IndexedLabeledGraph, lsrc, ltgt) = add_edge!(ig, incident(ig, [lsrc, ltgt], :label)...)
+
+ig = IndexedLabeledGraph{Type}()
+nodes = [Any, Number, Union{Int, String}, Int, String, Float64, Union{}]
+add_vertices!(ig, length(nodes); label=nodes)
+edges = [(Any, Number), (Any, Union{Int, String}), (Number, Int), (Number, Float64), (Float64, Union{}), (Union{Int, String}, Int), (Union{Int, String}, String), (Int, Union{}), (String, Union{})]
+for (node1, node2) in edges
+    add_ledge!(ig, node1, node2)
+end
+to_graphviz(ig, node_labels=:label)
+```
+
+A lattice is the mathematical structure consisting of a partially ordered set with two operations
+`meet` and `join` that return respectively a least upper bound and greatest lower bound.
+
+Lattices are important because compilers track many different types of information about variables,
+and lattices naturally represent the different properties variables can have throughout a program.
+Specifically, the closure properties of `meet` and `join` of lattices allow tracking
+the union and intersection of different types of constraints.
+
+In Julia's compiler, we use `⊑` for the partial ordering on a lattice.
+The lattice most familiar to Julia users is the type-lattice (`JLTypeLattice`) whose values are types ordered by `<:`.
+```julia
+import Core.Compiler: ⊑
+⊑(Int, Int)
+```
+```julia
+⊑(Int, Number)
+```
+```julia
+⊑(Integer, String)
+```
+
+In the type lattice, the meet operator is `typeintersect`[^1] and the join operator is `Union`.
+To see how these operations work, consider `T1 = Union{Complex, Integer}` and `T2 = Real`.
+`typeintersect(T1,T2)` equals `Integer` because `Integer` is the largest type which subtypes both `T1` and `T2`.
+Similarly, `Union{T1, T2}` is equal to `Union{Real, Complex}` which is the smallest type of which `T1` and `T2` are both subtypes.
+
+Because computing exact unions can create combiniatorial complexity in types, there is also `Core.Compiler.tmerge`.
+`tmerge` performs a lattice join but it also imposes limitations on the complexity of the returned type to prevent infinite loops in the compiler.
+`Core.Compiler.tmerge(T1,T2)==Any` which is a supertype of `T1` and `T2`, but `Any` is pretty clearly not a least upper bound.
+There is also `typejoin` which also gives an approximate upper bound and is made for users who want a relatively
+simple join of two types without some of the rigor that `tmerge` needs to prevent infinite loops. 
+
+The type lattice is a [Bounded lattice](https://en.wikipedia.org/wiki/Lattice_(order)#Bounded_lattice)
+which means it has a least and greatest element. The least element is `Union{}` since for all `T`, `⊑(Union{}, T)`.
+`Any` is the greatest element of the type lattice since for all `T`, `⊑(T, Any)`.
+One important thing to keep in mind is that despite being bounded,
+the lattices in Julia are not finite since you can have infinitely nested types (e.g. `Vector{Int}, Vector{Vector{Int}}` etc).
+
+Another important property of lattices is that they can be extended by adding elements to the set that are compatible with the lattice operations.
+An example of this for Julia is the const-lattice `ConstsLattice` which extends the type-lattice by tracking compile-time constants.
+```julia
+⊑(Core.Const(1), Int)
+```
+```julia
+⊑(Int, Core.Const(1))
+```
+```julia
+⊑(Core.Const(1), Core.Const(2))
+```
+```julia
+⊑(Core.Const(1), Number)
+```
+```{julia; echo = false}
+ig = IndexedLabeledGraph{Any}()
+nodes = [Any, Number, Union{Int, String}, Int, String, Float64, Core.Const(1), Core.Const(2), Union{}]
+add_vertices!(ig, length(nodes); label=nodes)
+edges = [(Any, Number), (Any, Union{Int, String}), (Number, Int), (Number, Float64), (Float64, Union{}), (Union{Int, String}, Int), (Union{Int, String}, String), (Int, Core.Const(1)), (Core.Const(1), Union{}), (Int, Core.Const(2)), (Core.Const(2), Union{}), (String, Union{})]
+for (node1, node2) in edges
+    add_ledge!(ig, node1, node2)
+end
+to_graphviz(ig, node_labels=:label)
+```
+
+There are a number of other lattices used by Julia's compiler including:
+1. `PartialsLattice`: This stores information about structs that have some but not all of their fields known as compiler time constants.
+2. `ConditionalsLattice`/`InterConditionalsLattice` 
+3. `MustAliasesLattice`/`InterMustAliasesLattice`: These track alias information. (you can generate faster code if you can prove that two variables refer to different memory)
+There are also a number of other lattice types.
+
+Sometimes it is useful to limit precision of your analysis in which case `Core.Compiler.widenconst` can be used to project an element from a more specific lattice to the type lattice (losing the extra information).
+
+Lattices in Julia's compiler are often variables named 𝕃.
+
+## [Abstract Interpretation](https://en.wikipedia.org/wiki/Abstract_interpretation)
+
+Julia wants to make your program fast. To do that it has to understand the code you wrote. To do this, the compiler will take the IR of a function and information about the inputs (usually types, but this information can also come from more specific lattices), and steps through the code to propagate the information. There is an inherent tradeoff here between accuracy and compile speed, and there are a number of flags (like `max-methods`) that determine how hard the compiler tries to understand what your function is doing. There exist programs (especially with recursion and type unstable loops) that are arbitrarily hard (or impossible) to analyze completely, so abstract interpretation has a number of mechanisms to bail out if it believes it is not making progress. Once abstract interpretation is finished, it returns typed IR code for the function it was analyzing. For example, `foo` is inferred as:
+```julia
+@code_typed optimize=false foo(1.0)
+```
+We can see here that inference was able to determine that `foo` would return a `Float64`, and we can also see constant propagation at work here[^2] since it was able to determine that `exp(2)` does not depend on the input arguments, and so the value will just be a constant number.
+
+## Effects
+
+Starting in Julia 1.8 Julia tracks a number of properties of functions. As of 1.10 these effects are:
+
+1. `consistent`. The function always returns the same result (or deterministically throws/does not terminate)
+2. `effect_free`. The function does not have externally visible side effects.
+3. `nothrow`. The function does not throw an error.
+4. `terminates_globally`. The function terminates.
+5. `terminates_locally`. The function terminates iff all functions it calls terminate.
+6. `notaskstate`. The function does not read or write task local state
+7. `inaccessiblememonly`. The function does not read or write mutable memory that is externally visable.
+
+This is currently used for two types of optimizations: dead code elimination and constant folding (also known as concrete evaluation. Constant folding can be applied to a function that is consistent, effect_free, and terminates. Given a function `f` that meets these conditions, any call to `f` with constant arguments can be constant folded (replacing the call to the function with the result of calling the function). The result of doing this is similar to that of constant folding but is [much faster](https://aviatesk.github.io/posts/effects-analysis/index.html).
+
+Dead code elimination allows eliminating calls to functions whose result isn't used as long as the function is nothrow, effect_free and terminates (note consistency isn't required for dead code elimination).
+
+There are a number of other optimizations that effects can enable (like loop invariant code movement) that may be implimented in the future using the effect system.
+
+Below is a diagram of the relation between all the effects. An arrow from `a` to `b` means that effect `a` implies effect `b`
+
+```{julia; echo = false}
+ig = IndexedLabeledGraph{String}()
+nodes = ["consistent",
+        "effect_free",
+        "nothrow",
+        "terminates_globally",
+        "terminates_locally",
+        "notaskstate",
+        "inaccessiblememonly",
+        "foldable",
+        "removable",
+        "total"]
+add_vertices!(ig, length(nodes); label=nodes)
+edges = [("total", "foldable"), ("total", "removable"), ("total", "notaskstate"), ("total", "inaccessiblememonly"),
+        ("foldable", "consistent"), ("foldable", "effect_free"), ("foldable", "terminates_globally"),
+        ("removable", "nothrow"), ("removable", "effect_free"), ("removable", "terminates_globally"),
+        ("terminates_globally", "terminates_locally"),
+        ]
+for (node1, node2) in edges
+    add_ledge!(ig, node1, node2)
+end
+to_graphviz(ig, node_labels=:label)
+```
+
+## Footnotes
+
+[^1]: technically `typeintersect` isn't quite a lattice meet operation because for performance reasons `typeintersect` will sometimes return a wider type than the intersection. For example
+```julia
+a = Tuple{T, Vector{T}} where T
+b = Tuple{Vector{S}, S} where S
+c = typeintersect(a, b)
+```
+while the actual greatest lower bound is
+`Union{Tuple{Vector{T},Vector{S}} where S>:Vector{T} where T>:Vector, Tuple{Vector{S},Vector{T}} where S>:Vector{T} where T>:Vector}`.
+
+This bound is inexact because we know that `c` is a subtype of `a` and `b`, so either `T=Vector{S}` or `S=Vector{T}`. As such, we know that either the first argument
+of the tuple is the eltype of the second argument, or the second argument is the eltype of the first.
+For example, this can be satified by `T==S==Vector`, but not by `T==S==Int` as stated by the `typeintersect` result. 
+To make matters worse, in this case, the `typeintersect` isn't even a subtype of either `a` or `b which really seems like it should always hold but doesn't.
+
+[^2]: this was true prior to version 1.8. In more recent versions this is actually an example of constant folding from the effect system

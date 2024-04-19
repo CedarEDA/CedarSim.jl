@@ -1,0 +1,9 @@
+{
+	"name": "memories",
+	"project": "yosys",
+	"paths": [
+		["tools", "yosys", "tests", "memories"]
+	],
+	"matches": ["*.v"],
+	"blacklist": ["issue00335.v"]
+}

@@ -1,0 +1,30 @@
+{
+	"name": "BaseJumpSTL",
+	"project": "basejump",
+	"paths": [
+		["cores", "basejump_stl", "*"]
+	],
+	"matches": ["*.v"],
+	"commons": [
+		"cores/basejump_stl/bsg_misc/bsg_defines.v",
+		"cores/basejump_stl/bsg_cache/bsg_cache_pkg.v",
+		"cores/basejump_stl/bsg_cache/bsg_cache_non_blocking_pkg.v"
+	],
+	"incdirs": [
+		"cores/basejump_stl/bsg_misc",
+		"cores/basejump_stl/bsg_noc"
+	],
+	"timeouts": {
+		"bsg_scatter_gather.v": "60",
+		"bsg_launch_sync_sync.v": "60",
+		"bsg_cache.v": "30",
+		"bsg_cache_non_blocking_mhu.v": "30",
+		"bsg_tag_master.v": "30",
+		"bsg_round_robin_fifo_to_fifo.v": "30"
+	},
+	"blacklist": [
+		"bsg_nonsynth_mixin_motherboard.v",
+		"test_bsg_clock_params.v"
+	],
+	"fake_topmodule": true
+}

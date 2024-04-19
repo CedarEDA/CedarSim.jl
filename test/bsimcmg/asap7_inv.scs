@@ -1,0 +1,10 @@
+simulator lang=spectre insensitive=yes
+
+// Inverter
+M1p (Vout Vgate VDD VDD) pmos_lvt
+M1n (Vout Vgate 0 0) nmos_lvt
+R1 (Vout 0) resistor r=10k
+
+// Voltage Sources
+VScc (VDD 0) vsource type=dc dc=1.8_V
+VSgate (Vgate 0) bsource v=1.8*(1-sin(10.0**7*2*pi*$time))

@@ -1,0 +1,285 @@
+## Introduction to DAECompiler.jl API
+
+1. Define structure with (constant) system parameters
+
+```julia
+using DAECompiler, OrdinaryDiffEq
+using DAECompiler: equation!, state_ddt, variable
+using DAECompiler: SciMLBase, ModelingToolkit
+
+struct Pendulum{T}
+    length::T
+    mass::T
+end
+```
+
+2. Describe the DAE system in a function using `variable`, `equation!` and `state_ddt`
+
+```julia
+# x, dx/dt, y, dy/dt, T, θ
+function (p::Pendulum)()
+    x = variable(:x) # x(t) - pendulum position
+    ẋ = variable(:ẋ)
+    y = variable(:y) # y(t) - pendulum position
+    ẏ = variable(:ẏ)
+    T = variable(:T) # T(t) - tension force
+    θ = variable(:θ) # θ(t) - pendulum angle (0 is vertical)
+    λ = T / (p.length * p.mass)
+    g = 10.          # gravitational acceleration
+
+    # After a bit of trigonometry, one can derive the following equations:
+    equation!.((
+        state_ddt(x) - ẋ, # = 0
+        state_ddt(y) - ẏ, # = 0
+        state_ddt(ẋ) + λ * x, # = 0
+        state_ddt(ẏ) + λ * y + g, # = 0
+        x - p.length * sin(θ), # = 0
+        y - p.length * cos(θ) # = 0
+    ))
+end
+```
+
+3. Define parameters, time step, and initial conditions
+
+```julia
+# N.B. Currently, hand-chosen u0 vectors like these are very error-prone since
+# there is no facility to map from symbol inputs to transformed variable indices.
+u0 = [pi/4., 0.0, 20. / sqrt(2.0)]
+tspan = (0.0, 100.0)
+p = Pendulum(1.0, 1.0);
+```
+
+4. Analyze by creating an `IRODESystem` and then a `DAE/ODEProblem`
+```julia
+sys = IRODESystem(Tuple{Pendulum{Float64}});
+daeprob = DAEProblem(sys, zero(u0), u0, tspan, p); # Option A: Build a DAE
+#odeprob = ODEProblem(sys, ode_u0, tspan, p);      # Option B: Build an ODE
+```
+
+5. Use an ODE/DAE Solver to solve your `Problem`
+```julia
+# XXX: Unfortunately, this example is currently broken. Encounters `SingularException`
+#daesol = solve(daeprob, DFBDF(autodiff=false));
+# N.B. The ODE formulation requires a solver that can handle singular mass matrices.
+#odesol = solve(odeprob, FBDF(autodiff=false));
+```
+
+## Technical Overview
+
+### DAECompiler Intrinsics
+Currently, DAECompiler has 5 intrinsics that it adds.
+1. `variable!` This statement introduces a variable into the system of equations.
+2. `equation!` This statement marks an equation. Specifically, once the system is lowered to an SSA form, `equation!` constrains the value of a given SSA variable to zero.
+3. `state_ddt` This represents the derivative with respect to time.
+4. `observed!` This creates an observable which is a quantity that isn't evolved with the system but the user wants to be able to query from the states.
+5. `sim_time` This is the time variable (time is special)
+
+ For explaining how DAECompiler works, we will be following the transformations of the following system.
+```julia
+using DAECompiler, OrdinaryDiffEq
+using DAECompiler: equation!, variable, state_ddt
+function var_phi()
+    x = variable(:x)
+    y = variable(:y)
+    z = variable(:z)
+    if y > 0.
+        a = 0.
+    else
+        a = z
+    end
+    equation!(x - 3.5 * a)
+    equation!(state_ddt(z))
+    equation!(state_ddt(x) - state_ddt(y))
+end
+```
+We can see that this function has three variables, `x, y, z` and 3 equations.
+
+### The Incidence Lattice
+DAECompiler adds a new lattice type which tracks exact linear and precense of nonlinear dependencies between statements.
+
+## Debugging/Internals
+
+This section introduces at a high level the debugging facilities in DAECompiler for diving into the SSAIR and MatchedSystemStructure as it is piped through the DAECompiler pipeline.
+
+First things first. Let's construct the DAE/ODEProblem we'd like to inspect:
+
+```julia
+using DAECompiler, DeepDiffs, OrdinaryDiffEq
+using DAECompiler: SciMLBase
+u0 = [pi/4., 0.0, 20. / sqrt(2.0)]
+tspan = (0.0, 100.0)
+x = Pendulum(1.0, 1.0)
+
+# Enable debug flags to save all intermediate IR/MatchedSystemStructure's
+debug_config = (; store_ir_levels = true, store_ss_levels = true)
+sys = IRODESystem(Tuple{typeof(x)}; debug_config)
+
+daeprob = DAEProblem(sys, zero(u0), u0, tspan, x);
+```
+
+#### DAECompiler IR
+
+Copies of the IR from various points in the DAECompiler pipeline are available in `DAECompiler.DebugConfig(state).ir_levels`:
+```julia
+# Truncate the output, just to avoid polluting the Weave
+function truncated_show(obj, max_chars)
+    io = IOBuffer(; maxsize=max_chars); show(io, obj); s = take!(io);
+    length(s) == max_chars ? println(String(s), "\n...\n") : println(String(s))
+end
+
+# The IR from early in the pipeline
+truncated_show(DAECompiler.DebugConfig(daeprob.f.sys.state).ir_levels[1], 800)
+
+# The most recently-executed stage of the pipeline
+truncated_show(DAECompiler.DebugConfig(daeprob.f.sys.state).ir_levels[end], 800)
+```
+
+If you're curious about where a step falls w.r.t. to the overall pipeline, take a look at the sequence of steps printed by the `print_timer` example above.
+
+#### ModelingToolkit SystemStructure
+
+For ModelingToolkit passes, `[Matched]SystemStructure` is the canonical representation of the  system of equations. To dig into the ModelToolkit internals, simply peek into `ss_levels`:
+```julia
+ss_levels = DAECompiler.DebugConfig(daeprob.f.sys.state).ss_levels
+
+# Look at what Pantelides updated
+display(deepdiff(ss_levels[1].mss, ss_levels[2].mss))
+
+# Look at entire MTK pipeline diff
+display(deepdiff(ss_levels[1].mss, ss_levels[end].mss))
+```
+
+## Advanced Debugging
+
+### Stages of SSAIR.
+DAECompiler keeps track of the various levels of IR through the transformation process. Once we make a `ODEProblem` of `var_phi` by
+```julia
+sys = IRODESystem(Tuple{typeof(var_phi)})
+odeprob = ODEProblem(sys, nothing, var_phi)
+```
+we can get a summary of the avialable levels of IR with `DAECompiler.summarize_ir_levels(odeprob)`
+
+#### Stage 1: unoptimized
+The unoptimized ir is the result of lowering and doing an initial type inference pass on the IR (it is the equivalent of `@code_typed optimie=false`. We can get this level of `ir` via `odeprob.f.sys.state.ir_levels[1]`. For the simple `var_phi` equation the ir is:
+```llvm
+2  1 ─ %1  = invoke DAECompiler.Intrinsics.variable($(QuoteNode(▫.x))::Scope)::Float64 │╻ variable
+3  │   %2  = invoke DAECompiler.Intrinsics.variable($(QuoteNode(▫.y))::Scope)::Float64 │╻ variable
+4  │   %3  = invoke DAECompiler.Intrinsics.variable($(QuoteNode(▫.z))::Scope)::Float64 │╻ variable
+5  │   %4  = invoke Main.:>(%2::Float64, 0.0::Float64)::Bool                           │
+   └──       goto #3 if not %4                                                         │
+6  2 ─       goto #4                                                                   │
+   3 ─       nothing::Nothing                                                          │
+10 4 ┄ %8  = φ (#2 => 0.0, #3 => %3)::Float64                                          │
+   │   %9  = invoke Main.:*(3.5::Float64, %8::Float64)::Float64                        │
+   │   %10 = invoke Main.:-(%1::Float64, %9::Float64)::Float64                         │
+   │   %11 = Main.equation!::Core.Const(DAECompiler.Intrinsics.equation!)              │
+   │         invoke %11(%10::Float64, DAECompiler.Intrinsics.nothing::Nothing)::Core.Const(nothing)
+11 │   %13 = invoke Main.state_ddt(%3::Float64)::Float64                               │
+   │   %14 = Main.equation!::Core.Const(DAECompiler.Intrinsics.equation!)              │
+   │         invoke %14(%13::Float64, DAECompiler.Intrinsics.nothing::Nothing)::Core.Const(nothing)
+12 │   %16 = invoke Main.state_ddt(%1::Float64)::Float64                               │
+   │   %17 = invoke Main.state_ddt(%2::Float64)::Float64                               │
+   │   %18 = invoke Main.:-(%16::Float64, %17::Float64)::Float64                       │
+   │   %19 = Main.equation!::Core.Const(DAECompiler.Intrinsics.equation!)              │
+   │   %20 = invoke %19(%18::Float64, DAECompiler.Intrinsics.nothing::Nothing)::Core.Const(nothing)
+   └──       return %20
+```
+
+#### Stage 2: post_replace_sls
+For this problem nothing changes here (this step only matters for equations that carry some type of equation state)
+#### Stage 3: post_compute_structure
+After we have the ir for the problem analyze it with the incidence lattice.
+
+#### Stage 4: post_diffractor
+#### Stage 5: pre_tearing
+#### Stage 6: post_tearing
+
+### ModelingToolkit Passes
+
+```
+                          ModelingToolkit Sub-Pipeline
+      ┌─────────────┐   ┌────────────┐   ┌─────────────┐   ┌─────────────────┐
+      │    Alias    │   │ Pantelides │   │    Dummy    │   │    Tearing /    │
+─────►│ Elimination ├──►│            ├──►│ Derivatives ├──►│ State Selection │──────►
+      └─────────────┘   └────────────┘   └─────────────┘   └─────────────────┘
+```
+
+###### Primary Outputs
+
+The primary outputs from the MTK pipeline are:
+-   variable alias graph
+-   updated Incidence information
+    - new differentiated eqs (and vars) in the SystemStructure
+    - updated linear coefficients in the statically solvable sub-graph?
+-   For each variable:
+    - where tearing succeeded, a matching equation OR
+    - where tearing failed, an attribute identifying the variable as a selected state
+
+###### Invariant
+
+At every stage in the ModelingToolkit pipeline, the total number of highest-differentiated variables should be equal to the number of highest-differentiated equations.
+
+A precise definition, accounting for the alias graph and the available information at each stage of the compiler pipeline, is TBD.
+
+#### Alias Elimination
+
+**Purpose:** Simplify the system of equations by identifying obvious variable identities.
+
+###### Data
+  - **Reads** the solvable graph and examines (static) linear coefficients
+  - **Adds** an alias graph
+  - **Deletes** redundant equations (uncommon)
+  - **Modifies** the var ↔ eq incidence graph
+           (by substituting discovered identities)
+
+**Summary:**
+    Precedes Pantelides and identifies variables that are +/- 1 * another variable (or identically 0). A variable is chosen as the representative for the alias set and kept in the system of equations, meanwhile all of its aliases are replaced with that representative (times +/-1) and added to the alias graph.
+
+
+#### Pantelides
+
+**Purpose:** Reduce DAE index by adding derivatives of equations
+
+###### Data
+ - **Reads** the full incidence graph (purely structural)
+ - **Adds** new equations, in the form of derivatives
+ - **Adds** var ↔ eq matching
+
+**Summary:**
+    Pantelides tries to construct a maximal matching between equations and variables that structurally depend on them. Structural independence means that a variable literally does not appear in the equation. The var ↔ eq matching is crucial because Pantelides declares that the problem is (structurally) index-0 once every variable can be matched to a unique equation.
+
+**Note: Approximating Incidence**
+    Over-approximation of incidence information can make a problem seem to have more structural non-zeroes than it really does. In this case, Pantelides can declare success early and leave the structural index higher than desired.
+
+
+#### Dummy Derivatives
+
+**Purpose:** Prevent integration drift by eliminating degrees-of-freedom with additional equations
+
+###### Data
+ - **Reads** the **solvable** incidence graph
+ - **Adds** new equations
+ - \<incomplete\>
+
+##### Caveats
+The system generated by dummy derivatives includes a choice of pivot, and its well-conditionedness depends on the space being traversed by the solver. On many problems (e.g. some formulations of the classic pendulum example), dynamic pivoting is required in order to avoid encountering a singular Jacobian.
+
+
+#### Tearing / State Selection
+
+Convert implicit equations into explicit assignments, and break algebraic dependency loops by using values from prior timesteps.
+
+###### Data
+ - **Reads** the **solvable** incidence graph (otherwise, purely structural)
+ - **Chooses** some variables to promote to `SelectedState`
+ - \<incomplete\>
+
+##### Caveats
+The choice of selected states is another "pivot" like what is encountered in the Dummy Derivatives algorithm, and for full generality it should be chosen dynamically. DAECompiler does not currently support this.
+
+### Glossary
+
+  - **Solvable** variable - A variable that DAECompiler knows how to solve. Typically, one with a fixed, linear coefficient.
+  - **State** variable - A variable that has been chosen by State Selection to be integrated (accumulated) by the ODE/DAE solver. After state selection, variables can be either (1) a state variable, or (2) a matched variable for some equation, or (3) an algebraic variable.
+  - **Algebraic** variable - A variable is algebraic if it is not matched to any equation and also not a selected state.
+  - **Matched** variable - A matched variable refers to the var↔eq matching constructed in Pantelides and updated at several stages thereafter. The meaning of the var↔eq assignment depends on the particular stage of the pipeline (e.g. in tearing it refers to variables we can solve for with explicit assignments, while in Pantelides it is a method for checking structural singularity).

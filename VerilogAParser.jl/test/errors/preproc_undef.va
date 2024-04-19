@@ -1,0 +1,3 @@
+module preproc_undef(p, n);
+    `IMPIcc( RGATEMOD      , 0            , ""           , 0           , 1           , "Gate resistance model selector")
+endmodule

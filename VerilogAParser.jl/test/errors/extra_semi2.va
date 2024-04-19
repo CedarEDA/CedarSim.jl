@@ -1,0 +1,18 @@
+`define MAX_EXP 5.834617425e14
+`define MIN_EXP 1.713908431e-15
+`define EXP_THRESHOLD 34.0
+
+module extra_semi2(p, n);
+    analog function real expclamp;
+        input x;
+
+        begin
+            if (x > `EXP_THRESHOLD)
+                expclamp = `MAX_EXP;
+            else if (x < `EXP_THRESHOLD)
+                expclamp = `MIN_EXP;
+            else
+                expclamp = exp(x);
+        end;
+    endfunction
+endmodule

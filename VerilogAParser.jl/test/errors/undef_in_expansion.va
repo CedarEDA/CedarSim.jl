@@ -1,0 +1,5 @@
+`define MPRnb(nam,def,uni,        des) (* units=uni, desc=des *) parameter real    nam=def;
+module undef_in_expansion(p, n)
+    `MPRnb( U0            , TYPE == `NTYPE ? 0.067 : 0.025
+                                           ,"m²/(V s)"                              , "Low-field mobility")
+end

@@ -1,0 +1,140 @@
+# Circuit debugging
+
+When working with circuits you will inevitably run into cases that fail to compile, initialise, solve, or produce correct results.
+While we expect things to get more robust over time, here are some things you can try when you're stuck.
+
+Let's take as an example this simple RLC circuit.
+
+```julia
+using CedarSim
+using CedarSim.SpectreEnvironment
+using Plots
+
+const R = CedarSim.SimpleResistor
+const C = CedarSim.SimpleCapacitor
+const L = CedarSim.SimpleInductor
+const V(v) = CedarSim.VoltageSource(dc=v)
+const I(i) = CedarSim.CurrentSource(dc=i)
+
+function VRCcircuit()
+    vcc = Named(net, "vcc")()
+    vrc = Named(net, "vrc")()
+    gnd = Named(net, "gnd")()
+    Named(V(v_val), "V")(vcc, gnd)
+    Named(R(r_val), "R")(vcc, vrc)
+    Named(C(c_val), "C")(vrc, gnd)
+    Gnd()(gnd)
+end
+```
+
+## Compilation
+
+If the circuit doesn't parse, that's a proper bug that can hopefully be identified by normal debugging techniques.
+
+A good sanity check is to call the circuit function. This will catch errors like undefined variables.
+
+```julia; error = true
+VRCcircuit()
+```
+
+oops so let's define those and try again.
+
+```julia
+const v_val = 5.0
+const r_val = 2000.0
+const c_val = 1e-6
+VRCcircuit()
+```
+
+The next step is making the system and the problem.
+The best type of problem to use in terms of numerics is `ODEProblem`,
+but it's not always the best for debugging and reliability.
+
+```julia
+using OrdinaryDiffEq
+
+sys = CircuitIRODESystem(VRCcircuit)
+prob = ODEProblem(sys, nothing, (0.0, 0.01))
+```
+
+You can also use `DAEProblem` which requires using less stable [DAE solvers](https://docs.sciml.ai/DiffEqDocs/stable/solvers/dae_solve/).
+The advantage is that it performs less transformations on the code, making debugging slighly easier.
+
+The ODE version takes `nothing` as the second argument (the states, `u`) which means it'll initialise with small random zeros.
+It's also possible to explicitly provide a vector of initial conditions for your states.
+The DAE version takes `du` and `u` arguments instead of just `u`, where `du` can also be `nothing` or the initial condition for you derivatives.
+
+But sometimes IR systems will just puke a few thousands lines of Julia IR, leaving you very confused.
+
+A key tell is if the last statements in the printed IR are `::Union{}` and `unreachable`.
+This means the compiler has statically inferred that the code would produce an error.
+(hence the return type is an empty union and the code after it is unreachable)
+
+Another tell is if there is a function or variable referred to as `Main.foo`
+while it should clearly be defined somewhere else. This could mean a typo or missing import.
+
+## Initialisating & solving
+
+Once you have made a system and problem, it's time to solve it.
+There are a sheer infinite amount of options to tweak here, some of which will make you bread and do the dishes.
+But let's focus on a few important ones.
+
+```julia
+sol = solve(prob, FBDF(autodiff=false); reltol=1e-5, abstol=1e-5, initializealg=CedarDCOp())
+```
+
+### Solver
+
+First of all, the solver. Quoting the [DAE solvers](https://docs.sciml.ai/DiffEqDocs/stable/solvers/dae_solve/) page:
+
+> If the problem cannot be defined in mass matrix form, the recommended method for
+> performance is `IDA` from the Sundials.jl package if you are solving problems with
+> `Float64`. If Julia types are required, currently `DFBDF` is the best method
+> but still needs more optimizations.
+
+Currently the IR system doesn't work with IDA, and IDA doesn't work with our initialization algorithm.
+Therefore DFBDF is our most used solver. It is however possible to use IDA on our Dyn systems.
+
+If you're using the ODE form, as you should in most cases, there are [many solvers](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems) to choose from.
+Circuits are stiff problems with low tolerance and costly f so you'll want to choose accordingly.
+We mostly use FBDF, because you only need to delete the D.
+
+At the moment IR systems do not support autodiff, but Dyn systems do.
+A Dyn system can also be initialized with `1e-7randn(Double64, n)` for more floating point precision.
+
+
+### Initialization Algorithm
+
+Circuits are kinda special in their initialisation in that the normal approach is to start them from steady state.
+This basically means that all the derivatives are zero.
+We have a custom SciML initialization algorithm called `CedarDCOp` that does that.
+
+In the past we have used `ShampineCollocationInit` with some success,
+and you'd think that setting `du` to all zeros and using `BrownFullBasicInit` should also work.
+Feel free to try any of them, but the Cedar ones tend to work best for us.
+
+### Tolerance
+
+Definitely play around with `reltol` and `abstol`.
+In particular, if you set your tolerance too tight it might exit with a dtmin warning or a singularity error.
+
+```julia; error = true
+solve(prob, FBDF(autodiff=false); reltol=1e-20, abstol=1e-20, initializealg=CedarDCOp())
+```
+
+# Output correctness
+
+Hopefully this plot will look like an RC step response. If it does not, there are a few things to try.
+
+![A plot](`j plot(sol)`)
+
+First of all, **do you have a ground node?** Is everything connected? Are you sure? Even the bulk terminals of the circuit the client gave you? (lolsob)
+
+Next, play with your solver options some more and try different types of systems and problems.
+
+And finally, try to simplify the circuit. Replace PWL with sine and sine with DC. Test a more simple circuit.
+
+# Everything is still broken!
+
+Worth checking if your version of DAECompiler, Diffractor, or Julia itself is outdated.
+Stuff is moving very quickly and a week old Julia can already be too old.

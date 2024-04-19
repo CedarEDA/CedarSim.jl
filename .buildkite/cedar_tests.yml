@@ -1,0 +1,99 @@
+steps:
+  - group: ":evergreen_tree: :electron: Cedar"
+    notify:
+      - github_commit_status:
+          context: "Tests"
+    steps:
+      - label: ":evergreen_tree: Test the package"
+        key: runtests-blessed
+        depends_on: build-blessed-linux-x86_64
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - JuliaCI/julia#v1: ~
+          - JuliaCI/julia-test#v1:
+              use_ssh: true
+              coverage: false
+              allow_reresolve: false
+              extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+          - staticfloat/metahook:
+              # Compress all of our `.ir` files into a single tarball:
+              pre-artifact: |
+                tar -C test/ir -czf test/ir.tar.gz . || true
+        agents:
+          os: "linux"
+          arch: "x86_64"
+        if: build.message !~ /\[skip tests\]/
+        timeout_in_minutes: 240
+        artifact_paths:
+          - "test/ir.tar.gz"
+          - "test/plots/*.html"
+          - "test/plots/*.png"
+          - "test/plots/*.csv"
+
+      - label: ":evergreen_tree: :straight_ruler: Run benchmarks"
+        depends_on: build-blessed-linux-x86_64
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - JuliaCI/julia#v1: ~
+          # We're not actually running tests here, we just want to make use of this plugin's
+          # ability to add an extra registry for us
+          - JuliaCI/julia-test#v1:
+                use_ssh: true
+                run_tests: false
+                extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+        commands: |
+          echo "--- Prepare dependencies"
+          apt update && apt install -y make
+          julia --project                    -e 'import Pkg; Pkg.instantiate()'
+          julia --project=scratch/benchmarks -e 'import Pkg; Pkg.instantiate()'
+          echo "+++ Run benchmarks"
+          make -j$(nproc) --output-sync -C scratch/benchmarks
+          tar -czvf scratch/benchmarks/output/ir.tar.gz scratch/benchmarks/output/ir
+        agents:
+          os: "linux"
+          arch: "x86_64"
+        if: build.message !~ /\[skip tests\]/
+        timeout_in_minutes: 180
+        artifact_paths:
+          - "scratch/benchmarks/output/*"
+          - "scratch/benchmarks/output_stats/*"
+
+  # Keep outside of the group, until buildkite fixes their notification reporting to be logical-and-except-soft_fail
+  - label: ":evergreen_tree: Test the package on julia master"
+    env:
+      GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+    depends_on: build-blessed-linux-x86_64
+    soft_fail: true
+    plugins:
+      - staticfloat/ssh-agent:
+          keyvars:
+            - "GITHUB_SSH_KEY"
+      # This one just installs the nightly, to track whether things are broken on nightly.
+      - JuliaCI/julia#v1:
+          version: nightly
+      - JuliaCI/julia-test#v1:
+          use_ssh: true
+          coverage: false
+          extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+      - staticfloat/metahook:
+          # Compress all of our `.ir` files into a single tarball:
+          pre-artifact: |
+            tar -C test/ir -czf test/ir.tar.gz . || true
+    agents:
+      os: "linux"
+      arch: "x86_64"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 240
+    artifact_paths:
+      - "test/ir.tar.gz"
+      - "test/plots/*.html"
+      - "test/plots/*.png"
+      - "test/plots/*.csv"

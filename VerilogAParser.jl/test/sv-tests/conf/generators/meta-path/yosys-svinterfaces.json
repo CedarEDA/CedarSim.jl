@@ -1,0 +1,9 @@
+{
+	"name": "svinterfaces",
+	"project": "yosys",
+	"paths": [
+		["tools", "yosys", "tests", "svinterfaces"]
+	],
+	"matches": ["*.sv"],
+	"blacklist": ["svinterface1.sv", "svinterface_at_top.sv"]
+}

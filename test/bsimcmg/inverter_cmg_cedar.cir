@@ -1,0 +1,16 @@
+** Test circuit
+
+.include "jlpkg://ASAP7PDK/7nm_TT.pm"
+
+* built-in
+mneg Q D VSS VSS nmos_lvt
+mpos Q D VDD VDD pmos_lvt
+
+VVDD VDD 0 1.0
+VVSS VSS 0 0.0
+CQ D 0 1e-15
+VD D 0 AC 1 SIN (0.5 0.01 1e7)
+
+.TRAN 1e-9 4.0e-7
+
+.END

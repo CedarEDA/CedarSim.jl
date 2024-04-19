@@ -1,0 +1,8 @@
+    r0 1 0 1k
+    simulator lang=spectre
+    r2 (1 0) resistor r=1k
+    simulator lang=spice
+    r1 1 0 1k
+    v1 1 0 1
+    simulator lang=spectre
+    r3 (1 0) resistor r=1k

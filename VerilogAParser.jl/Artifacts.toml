@@ -1,0 +1,6 @@
+[vams]
+git-tree-sha1 = "bbc32ed1fb39663874d8f997243eeaf7b90e6554"
+
+    [[vams.download]]
+    sha256 = "1a48381bd65efa0bcca3eee80de21dbfc0b3dc586223bd5bde1433ab751251bc"
+    url = "https://jc-cedarsim-juliabuilds.s3.amazonaws.com/artifacts/vams-0.1.0-7b90e6554.tar.gz"

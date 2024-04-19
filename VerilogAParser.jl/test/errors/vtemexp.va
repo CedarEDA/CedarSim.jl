@@ -1,0 +1,27 @@
+module vtemexp(p, n);
+
+    analog function real vtmexp;
+        input VTM0, vjct, njtemp, VTS;
+        real VTM0, vjct, njtemp, VTS;
+
+        begin
+            Nvtm = VTM0 * njtemp;
+            if ((VTS - vjct) < VTS * 1e-3) begin
+                T9 = 1.0e3;
+                T0 = - vjct / Nvtm * T9;
+                vtmexp = lexp(T0);
+            else
+                T9 = 1.0 / (VTS - vjct);
+                T0 = - vjct / Nvtm * VTS * T9;
+                vtmexp = lexp(T0);
+            end
+        end
+    endfunction
+
+    inout p, n;
+    electrical p, n;
+
+    analog begin
+        I(p,n) <+ 0;
+    end
+endmodule

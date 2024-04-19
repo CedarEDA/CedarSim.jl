@@ -1,0 +1,5 @@
+[deps]
+CedarSim = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"

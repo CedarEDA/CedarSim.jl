@@ -1,0 +1,27 @@
+[31m[1m╭ ERROR [VAS25]:[22m[39m[31m Unexpected analog keyword.[39m
+[31m│[39m[90m   ╭───── nfd.va:3[39m
+[31m│[90m3[0m  [90m│[0m     analog function integer NumFingerDiff;
+[31m│[90m4[0m  [90m│[0m         input nf, minSD;
+[31m│[90m5[0m  [90m│[0m         output niIntD, nuEndD, nuIntS, nuEndS;
+[31m│[90m6[0m  [90m│[0m 
+[31m│[90m7[0m  [90m│[0m         integer minSD;
+[31m│[90m8[0m  [90m│[0m         real nf, nuIntD, nuEndD, nuIntS, nuEndS;
+[31m│[90m9[0m  [90m│[0m 
+[31m│[90m10[0m [90m│[0m         analog begin
+[31m│[0m   [90m┊[0m         [91m━━━┳━━
+[31m│[0m   [90m┊[0m [91m✗ Illegal Analog Keyword[0m
+[31m│[90m11[0m [90m│[0m             if ((truncInt(NF)%2) != 0) begin
+[31m│[90m12[0m [90m│[0m                 nuEndD = 1.0
+[31m│[90m13[0m [90m│[0m                 nuEndS = 1.0
+[31m│[90m14[0m [90m│[0m                 nuIntD = 2.0 * max((nf - 1.0) / 2.0, 0.0);
+[31m│[90m15[0m [90m│[0m                 nuIntS = nuIntD;
+[31m│[90m16[0m [90m│[0m             end else begin
+[31m│[90m17[0m [90m│[0m                 if (minSD == 1) // minimize # of sources
+[31m│[90m18[0m [90m│[0m                     nuEndD = 2.0
+[31m│[90m19[0m [90m│[0m                     nuIntD = 2.0 * max(nf/2.0 - 1.0, 0.0);
+[31m│[90m20[0m [90m│[0m                     nuEndS = 0.0;
+[31m│[90m21[0m [90m│[0m                     nuIntS = nf;
+[31m│[90m22[0m [90m│[0m                 else
+[31m│[90m23[0m [90m│[0m                     nuEndD = 0.0;
+[31m│[39m[90m   │[39m
+[31m│[39m[90m   ╰───── [39m

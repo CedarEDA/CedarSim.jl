@@ -1,0 +1,15 @@
+[31m[1m╭ ERROR [VAS04]:[22m[39m[31m Macro Evaluation recursed.[39m
+[31m│[39m[90m   ╭───── recursive_macro.va:22[39m
+[31m│[90m22[0m [90m│[0m     `MPRnbS( AIGSD         , TYPE == `ntype ? 1.36e-2 : 9.8e-3, "√(Fs²/g)m⁻¹"       , "Parameter for Igs,d")
+[31m│[39m[90m   ├───── Using macro [39m[92m`MPRnbS[39m[90m at recursive_macro.va:18[39m
+[31m│[90m18[0m [90m│[0m `define MPRnbS(nam,def,uni,        des) `MPRnbS(nam,def,uni,        des) `ScalePars(nam)
+[31m│[39m[90m   ├───── Expanded to[39m
+[31m│[90m22[0m [90m│[0m [92m [91m`MPRnbS[92m(
+[31m│[0m   [90m┊[0m  [91m━━━┳━━━
+[31m│[0m   [90m┊[0m [91m✗ Recusive macro expansion[0m
+[31m│[39m[90m   │[39m
+[31m│[39m[90m   ╰───── [39mMacro Evaluation recursed [39m[1m`MPRnbS[22m.
+[31m│[39m
+[31m│[39m[34m help: [39mThe code made use of the macro [39m[1m`MPRnbS[22m while evaluation the same macro.
+[31m│[39m       Check for spelling mistakes or definition ordering.
+[31m╯[39m

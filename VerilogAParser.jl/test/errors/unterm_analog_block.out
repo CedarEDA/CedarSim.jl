@@ -1,0 +1,28 @@
+[31m[1m╭ ERROR [VAS49]:[22m[39m[31m Unterminated Analog Block.[39m
+[31m│[39m[90m   ╭───── unterm_analog_block.va:2[39m
+[31m│[90m2[0m  [90m│[0m     analog begin
+[31m│[0m   [90m┊[0m            [33m━━┳━━
+[31m│[0m   [90m┊[0m      [33mBlock starts here[0m
+[31m│[90m3[0m  [90m│[0m         // ************************************************
+[31m│[90m4[0m  [90m│[0m         // *      Geometry dependent calculations         *
+[31m│[90m5[0m  [90m│[0m         // ************************************************
+[31m│[90m6[0m  [90m│[0m         [92mbegin[0m : B4BiasIndepCalc
+[31m│[90m7[0m  [90m│[0m             devsign = TYPE;
+[31m│[90m8[0m  [90m│[0m             Temp = $temperature;
+[31m│[90m9[0m  [90m│[0m 
+[31m│[90m10[0m [90m│[0m             if (MTRLMOD == 0)
+[31m│[90m11[0m [90m│[0m                 if ($param_given(TOXE) && $param_given(TOXP) && $param_given(DTOX) &&
+[31m│[90m12[0m [90m│[0m                         TOXE != TOXP + DTOX)
+[31m│[90m13[0m [90m│[0m                     $strobe("Warning: toxe, toxp and dtox all given and toxe != toxp + dtox; dtox ignored");
+[31m│[90m14[0m [90m│[0m                 else if ($param_given(TOXE) && !$param_given(TOXP))
+[31m│[90m15[0m [90m│[0m                     TOXP = TOXE - DTOX;
+[31m│[90m16[0m [90m│[0m                 else if (!$param_given(TOXE) && $param_given(TOXP)) [36mbegin[0m
+[31m│[90m17[0m [90m│[0m                     TOXE = TOXP + DTOX;
+[31m│[90m18[0m [90m│[0m                     if (!$param_given(TOXM)) // 4.7
+[31m│[90m19[0m [90m│[0m                         TOXM = TOXE;
+[31m│[90m20[0m [90m│[0m                     [36mend[0m
+[31m│[90m21[0m [90m│[0m                 [92mend[91m◌ 
+[31m│[0m   [90m┊[0m                    [32mend[0m
+[31m│[90m22[0m [90m│[0m             else
+[31m│[39m[90m   │[39m
+[31m│[39m[90m   ╰───── [39m

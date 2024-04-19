@@ -1,0 +1,4 @@
+name = "Lexers"
+uuid = "8fc43420-9e17-4e89-a998-f4e9593a1dfc"
+authors = ["JuliaHub, Inc. and other contributors"]
+version = "0.4.0"

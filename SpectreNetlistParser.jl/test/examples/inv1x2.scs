@@ -1,0 +1,19 @@
+simulator lang=spectre insensitive=yes
+global 0
+include "libs/spectre/7nm_TT.scs"
+M1p (Y A VDD VDD) pmos_sram L=20n nfin=2
+M1n (Y A VSS VSS) nmos_sram L=20n nfin=2
+
+// load
+r1 (Y 0) resistor r=10k
+c1 (Y 0) capacitor c=100f
+r2 (Y VDD) resistor r=10k
+c2 (Y VDD) capacitor c=100f
+
+// stimulus
+v1 (vdd 0) vsource type=dc dc=0.7_V 
+v2 (A 0) vsource type=pulse val0=0 val1=0.7 delay=2.5ns rise=60ps fall=60ps width=15ns period=30ns
+
+tran tran stop=100ns
+saveOptions options  save=allpub  saveahdlvars=all
+save A Y

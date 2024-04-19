@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020-2021 The SymbiFlow Authors.
+#
+# Use of this source code is governed by a ISC-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/ISC
+#
+# SPDX-License-Identifier: ISC
+
+import re
+import os
+import sys
+import glob
+
+templ = """/*
+:name: {0}
+:description: Test imported from ivtest
+:files: {1}
+:incdirs: {4}
+:tags: ivtest
+{2}
+{3}
+{5}
+*/
+"""
+
+try:
+    third_party_dir = os.environ['THIRD_PARTY_DIR']
+    tests_dir = os.environ['TESTS_DIR']
+    conf_dir = os.environ['CONF_DIR']
+except KeyError:
+    print("Export the THIRD_PARTY_DIR, TESTS_DIR and CONF_DIR variables first")
+    sys.exit(1)
+
+try:
+    tests_subdir = sys.argv[1]
+except IndexError:
+    print("Usage: ./generator <subdir>")
+    sys.exit(1)
+
+type_should_fail = ['CE', 'RE']
+
+# FIXME: this all needs to be updated to properly load the ivtest *.list
+#        files like is done with the ivtest driver along with the correct
+#        override of the various tests.
+ivtest_list_exclude = [
+    'blif.list',  # Skip the BLIF test list
+    'regress-ivl1.list',  # Skip the Icarus specific test list
+    'regress-ivl2.list',  # Skip the Icarus strict test list
+    'regress-msys2.list',  # Skip the msys2 override test list
+    'regress-v10.list',  # Skip the v10 override test list
+    'regress-v11.list',  # Skip the v11 override test list
+    'regress-v12.list',  # Skip the v12 override test list
+    'regress-vams.list',  # Skip the VAMS test list
+    'regress-vhdl.list',  # Skip the VHDL test list
+    'regress-vlog95.list',  # Skip the vlog95 override test list
+    'vhdl_regress.list',  # Skip the VHDL side test list
+    'vpi_regress.list'  # Skip the VPI test list
+]
+
+ivtest_file_exclude = [
+    # The following are invalid per the latest standard, but are supported by
+    # commercial tools. For now exclude these tests in sv-tests.
+    # '{} (empty array)
+    'sv_array_assign_pattern2',
+    'sv_darray_args1',
+    'sv_darray_args2',
+    'sv_darray_args2b',
+    'sv_darray_args3',
+    'sv_darray_args4',
+    'sv_queue_real',
+    'sv_queue_string',
+    'sv_queue_vec',
+    # pullup/down with multiple terminals
+    'pr1787423',
+    'pr1787423b',
+    'pr2834340',
+    'pr2834340b',
+    # Parallel path '=>' with multiple input terminals
+    'pr1877743',
+    'specify_01',
+    # Parameter override without parens
+    'pr3194155',
+    'z1',
+    'z2',
+    # Empty parameter override
+    'pr1716276',
+    # Package scope event access
+    'sv_wildcard_import2',
+    'sv_wildcard_import3',
+    # Packed dims support [<dim>] for [0:<dim>-1] just like unpacked dims
+    'display_bug',
+    # `protect compiler directives
+    'pr478',
+    # `suppress_faults compiler directives
+    'pr1467825',
+    # generate begin/end was valid when generate was initially defined
+    'br988',
+    'pr2257003',
+    'pr2257003b',
+    # Using %v with a variable
+    'pr923',
+    # $itor(real) and $rtoi(self-determined integer)
+    'itor_rtoi',
+    # $printtimescale() can be passed more than a module identifier
+    'pr1701855b',
+    # Extra module instance parameters are a warning and then ignored
+    'param_test3',
+    # Initialization can be used with non-ANSI port definitions
+    'pr2790236',
+    # A foreach can have statement_or_null
+    'sf1289',
+    # These are optional system tasks and functions and may not be supported
+    'countdrivers1',
+    'countdrivers2',
+    'countdrivers3',
+    'countdrivers4',
+    'countdrivers5',
+    # Icarus checks that always blocks have delay constructs to prevent
+    # infinite loops. For now exclude these. I would ideally like to make
+    # these marked as fails for Icarus and and correctly parsed for others.
+    'always4A',
+    'always4B',
+    'always311A',
+    'always311B',
+    'always312A',
+    'always312B',
+    'always312C',
+    'always312D',
+    'always312E',
+    'always312F',
+    'always312G',
+    'always312H',
+    'always312I',
+    'always313A',
+    'always313B',
+    'always313C',
+    'always313D',
+    'always313E',
+    'always313F',
+    'always313G',
+    'always313H',
+    'always313J',
+    'always319A',
+    'always319B',
+    'always3110A',
+    'br991b',
+    'pr1862744b',
+    # Icarus checks that the always_* processes do not contain delay
+    # constructs and that the always_ff has a sensitivity list. These should
+    # should fail in Icarus, but should parse correctly.
+    'always_comb_fail3',
+    'always_comb_fail4',
+    'always_comb_fail',
+    'always_ff_fail2',
+    'always_ff_fail3',
+    'always_ff_fail4',
+    'always_ff_fail',
+    'always_ff_no_sens',
+    'always_latch_fail3',
+    'always_latch_fail4',
+    'always_latch_fail',
+    'always_latch_no_sens',
+    # '@ *' is valid and supported by commercial tools
+    'case3',
+    'wildsense'
+    # The following tests need to be looked at and verified
+    'pr1723367',  # scalar with vectored net
+    'undef',  # undefined macro behaviour is ambiguous
+]
+
+ivtest_long = ['comp1000', 'comp1001']
+
+ivtest_dir = os.path.abspath(os.path.join(third_party_dir, "tests", "ivtest"))
+ivtest_list_exclude = set(
+    map(lambda x: os.path.join(ivtest_dir, x), ivtest_list_exclude))
+ivtest_lists = sorted(
+    list(
+        set(glob.glob(os.path.join(ivtest_dir, '*.list'))) -
+        ivtest_list_exclude))
+
+tests = []
+
+skip = False
+
+incdirs = [ivtest_dir, os.path.join(ivtest_dir, 'ivltests')]
+
+for l in ivtest_lists:
+    list_filename = re.match(r'.*/([^/]*)\.list', l).group(1)
+    with open(l, 'r') as f:
+        for line in f:
+            if skip:
+                skip = False
+                continue
+
+            # remove comments
+            line = re.sub(r'#.*?\n', '', line)
+
+            # skip multiline definitions
+            if re.search(r'\\\n', line):
+                skip = True
+                continue
+
+            line = line.split()
+
+            if len(line) < 3:
+                continue
+
+            # skip Not Implemented tests
+            if re.match('NI', line[1]):
+                continue
+
+            name = line[0]
+            path = os.path.join(ivtest_dir, line[2], line[0] + '.v')
+            should_fail_because = ''
+
+            # sanitize name
+            name = re.sub(r'\W', '', name)
+
+            if name in ivtest_file_exclude:
+                continue
+
+            type_ = ''
+            for t in type_should_fail:
+                if re.match(t, line[1]):
+                    should_fail_because = ':should_fail_because: this test was imported from ivtest and is designed to fail'
+                    type_ = ':type: simulation'
+
+            timeout = ''
+            if name in ivtest_long:
+                timeout = ':timeout: 30'
+
+            tests.append(
+                (
+                    list_filename + '_' + name + '_iv', path,
+                    should_fail_because, type_, ' '.join(incdirs), timeout))
+
+test_dir = os.path.join(tests_dir, 'generated', tests_subdir)
+
+if not os.path.isdir(test_dir):
+    os.makedirs(test_dir, exist_ok=True)
+
+for test in tests:
+    test_file = os.path.join(test_dir, test[0] + '.sv')
+    with open(test_file, "w") as f:
+        f.write(templ.format(*test))

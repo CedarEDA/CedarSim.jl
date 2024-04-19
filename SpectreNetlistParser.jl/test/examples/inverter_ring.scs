@@ -1,0 +1,73 @@
+// Ring oscillator Spectre deck for INVERTER ring with no fanouts.simulator lang=spectre
+global 0 gnd vdd vss
+aliasGnd ( gnd 0 ) vsource type=dc dc=0
+
+// Spectre options to be usedSetOption1 options  iabstol=1.00n audit=full temp=25
+MyAcct1 info what=inst extremes=yes
+MyAcct2 info what=models extremes=yes
+MyAcct3 info what=input extremes=yes
+MyAcct5 info what=terminals extremes=yes
+MyAcct6 info what=oppoint extremes=yes
+
+// Next section is the subckt for invsubckt inv ( nq a )
+subckt inv ( nq a )
+m1 ( nq a vdd vdd ) p l=0.35u w=2.60u ad=1.90p pd=6.66u as=1.90p ps=6.66u
+m2 ( vss a nq vss ) n l=0.35u w=1.10u ad=0.80p pd=3.66u as=0.80p ps=3.66u
+// Interconnect Caps for invc0 ( a vdd ) capacitor c=1.0824323e-15
+c1 ( a nq ) capacitor c=3.0044e-16
+c2 ( nq vss ) capacitor c=5.00186e-16
+c3 ( nq vdd ) capacitor c=6.913993e-16
+c4 ( a vss ) capacitor c=8.5372566e-16
+ends
+
+// Begin top level circuit definitionxinv1 ( 1 90 ) inv
+xinv2 ( 2 1 ) inv
+xinv3 ( 3 2 ) inv
+xinv4 ( 4 3 ) inv
+xinv5 ( 5 4 ) inv
+xinv6 ( 6 5 ) inv
+xinv7 ( 7 6 ) inv
+xinv8 ( 8 7 ) inv
+xinv9 ( 9 8 ) inv
+xinv10 ( 10 9 ) inv
+xinv11 ( 11 10 ) inv
+xinv12 ( 12 11 ) inv
+xinv13 ( 13 12 ) inv
+xinv14 ( 14 13 ) inv
+xinv15 ( 15 14 ) inv
+xinv16 ( 16 15 ) inv
+xinv17 ( 90 16 ) inv
+
+// Next couple of lines sets variables for vdd and vss.parameters vdd_S1=3.3
+parameters vss_S1=0.0
+vdd_I1 ( vdd gnd ) vsource dc=vdd_S1
+vss_I1 ( vss gnd ) vsource dc=vss_S1
+
+// Set initial conditions:
+ic  2=0 4=0 6=0 8=0 10=0
+
+//  Next line makes the call to the model//  NOTE: The user may utilize the '.lib' syntax with Spectre's +spp
+//  command line option if they are using Spectre 4.43 or greater.
+//  There is also a Spectre native syntax for equivalent
+// functionality. It is shown in q35d4h5.modsp.
+include "q35d4h5.modsp" section=tt
+
+// Analysis Statement
+tempOption options temp=25
+typ_tran tran step=0.010n stop=35n
+
+alter_ss altergroup {
+    include "q35d4h5.modsp" section=ss
+    parameters vdd_S1=3.0
+}
+
+alterTempTo100 alter param=temp value=100
+ss_tran tran step=0.010n stop=35n
+
+alter_ff altergroup {
+    include "q35d4h5.modsp" section=ff
+    parameters vdd_S1=3.3
+}
+
+alterTempTo0 alter param=temp value=0
+ff_tran tran step=0.010n stop=35n

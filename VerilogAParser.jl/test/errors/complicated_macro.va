@@ -1,0 +1,56 @@
+`define GMIN        $simparam("gmin",1e-12)
+
+module complicated_macro(x);
+`define DIMOD(cb, SD)                                                      \
+    Nvtm = VTM * NJ``SD;                                                   \
+    if (A``SD``EFF <= 0.0 && P``SD``EFF <= 0.0)                            \
+        SatCurrent = 0.0;                                                  \
+    else                                                                   \
+        SatCurrent = A``SD``EFF * SD``jctTempSatCurDensity +               \
+            P``SD``EFF * SD``jctSidewallTempSatCurDensity +                \
+            WEFFCJ * NF * SD``jctGateSidewallTempSatCurDensity;            \
+                                                                           \
+    if (SatCurrent <= 0.0)                                                 \
+        cb = `GMIN * vjct;                                                 \
+    else case (DIOMOD)                                                     \
+        0: begin                                                           \
+            evb = exp(vjct / Nvtm);                                        \
+            T1 = XJVB``SD * exp(-(BV``SD + vjct) / Nvtm);                  \
+            cb = SatCurrent * (XExpBV``SD - T1 - 1.0) + `GMIN * vjct;      \
+        end;                                                               \
+        1: begin                                                           \
+            T2 = vjct / Nvtm;                                              \
+            if (T2 < -`EXP_THRESHOLD)                                      \
+                cbs = SatCurrent * (`MIN_EXP - 1.0) + `GMIN * vjct;        \
+            else if (vbs_jct <= VJ``SD``MFWD)                              \
+                cbs = SatCurrent * (exp(T2) - 1.0) + `GMIN * vjct;         \
+            else                                                           \
+                cbs = IVJ``SD``MFWD - SatCurrent + IVJ``SD``MFWD /         \
+                        Nvtm * (vjct - VJ``SD``MFWD) + `GMIN * vjct;       \
+        end;                                                               \
+        2: begin                                                           \
+            if (vjct < VJ``SD``MREV) begin                                 \
+                T0 = cvs_jct / Nvtm;                                       \
+                evbs = expclamplow(T0);                                    \
+                T1 = evbs = 1.0;                                           \
+                T2 = VJ``SD``MREV + SD``SLPREV + (vjct - VJ``SD``MREV);    \
+                cbs = T1 * T2 + `GMIN * vbs_jct;                           \
+            end else if (vjct <= VJ``SD``MFWD) begin                       \
+                T0 = vjct / Nvtm;                                          \
+                evbs = expclamplow(T0);                                    \
+                T1 = (BVS + vjct) / Nvtm;                                  \
+                T2 = expclamplow(-T1);                                     \
+                cbs = SatCurrent *                                         \
+                    (evbs + XExpBV``SD - 1.0 - XJBV``SD * T2) +            \
+                    `GMIN * vjct;                                          \
+            end else                                                       \
+                cbs = IVJ``SD``MFWD + SSLPFWD * (vbs_jct - VJ``SD``MFWD)   \
+                    + `GMIN * vjct;                                        \
+        end;                                                               \
+    endcase
+
+    analog begin
+        vjct = vbs_jct;
+        `DIMOD(cbs,S)
+    end
+endmodule

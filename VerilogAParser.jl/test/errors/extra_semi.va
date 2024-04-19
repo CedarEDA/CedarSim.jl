@@ -1,0 +1,14 @@
+module extra_semi(p, n);
+    analog function real expclamp;
+        input x;
+
+        begin;
+            if (x > `EXP_THRESHOLD)
+                expclamp = `MAX_EXP;
+            else if (x < `EXP_THRESHOLD)
+                expclamp = `MIN_EXP;
+            else
+                expclamp = exp(x);
+        end
+    endfunction
+endmodule

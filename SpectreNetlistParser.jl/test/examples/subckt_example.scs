@@ -1,0 +1,77 @@
+// GaAs Traveling Wave Amplifier// GaAs Traveling-wave distributed amplifier (2-26.5GHz)
+// Designed by Jerry Orr, MWTD Hewlett-Packard Co.
+// 1986 MTT symposium; unpublished material.
+global gnd vdd
+simulator lang=spectre
+// Modelsmodel nGaAs gaas type=n vto=-2 beta=0.012 cgs=.148p cgd=.016p fc=0.5
+subckt cell (o g1 g2)
+    TL   (o    gnd  d    gnd)  tline len=355u vel=0.36
+    Gt   (d    g2   s)         nGaAs
+    Ctgd (d    s)              capacitor c=0.033p
+    Cgg  (g2   gnd)            capacitor c=3p
+    Gb   (s    g1   gnd)       nGaAs
+    Cbgd (s    gnd)            capacitor c=0.033p
+    Ro   (d    c)              resistor r=4k
+    Co   (c    gnd)            capacitor c=0.165p
+ends cell
+subckt stage (i0 o8)// Devices
+    Q1      (o1      i1      b2)      cell
+    Q2      (o2      i2      b2)      cell
+    Q3      (o3      i3      b2)      cell
+    Q4      (o4      i4      b2)      cell
+    Q5      (o5      i5      b2)      cell
+    Q6      (o6      i6      b2)      cell
+    Q7      (o7      i7      b2)      cell
+    // Transmission linesTLi1   (i0    gnd     i1    gnd)    tline   len=185u  z0=96  vel=0.36
+    TLi2   (i1    gnd     i2    gnd)    tline   len=675u  z0=96  vel=0.36
+    TLi3   (i2    gnd     i3    gnd)    tline   len=675u  z0=96  vel=0.36
+    TLi4   (i3    gnd     i4    gnd)    tline   len=675u  z0=96  vel=0.36
+    TLi5   (i4    gnd     i5    gnd)    tline   len=675u  z0=96  vel=0.36
+    TLi6   (i5    gnd     i6    gnd)    tline   len=675u  z0=96  vel=0.36
+    TLi7   (i6    gnd     i7    gnd)    tline   len=675u  z0=96  vel=0.36
+    TLi8   (i7    gnd     i8    gnd)    tline   len=340u  z0=96  vel=0.36
+    TLo1   (o0    gnd     o1    gnd)    tline   len=360u  z0=96  vel=0.36
+    TLo2   (o1    gnd     o2    gnd)    tline   len=750u  z0=96  vel=0.36
+    TLo3   (o2    gnd     o3    gnd)    tline   len=750u  z0=96  vel=0.36
+    TLo4   (o3    gnd     o4    gnd)    tline   len=750u  z0=96  vel=0.36
+    TLo5   (o4    gnd     o5    gnd)    tline   len=750u  z0=96  vel=0.36
+    TLo6   (o5    gnd     o6    gnd)    tline   len=750u  z0=96  vel=0.36
+    TLo7   (o6    gnd     o7    gnd)    tline   len=750u  z0=96  vel=0.36
+    TLo8   (o7    gnd     o8    gnd)    tline   len=220u  z0=96  vel=0.36
+    // Bias network// drain bias
+    Ldd     (vdd     o0)      inductor        l=1u
+    R1      (o0      b1)      resistor        r=50
+    C1      (b1      gnd)     capacitor       c=9p
+    // gate 2 bias
+    R2      (b1      b2)      resistor        r=775
+    R3      (b2      gnd)     resistor        r=465
+    C2      (b2      gnd)     capacitor       c=21p
+    // gate 1 bias
+    R4      (i8      b3)      resistor        r=50
+    R5      (b3      gnd)     resistor        r=500
+    C3      (b3      gnd)     capacitor       c=12p
+ends stage
+// Two stage amplifier
+P1      (in      gnd)     port      r=50    num=1   mag=0
+Cin     (in      in1)     capacitor         c=1n
+X1      (in1     out1)    stage
+Cmid    (out1    in2)     capacitor         c=1n
+X2      (in2     out2)    stage
+Cout    (out2    out)     capacitor         c=1n
+P2      (out     gn)      port      r=50    num=2
+// Power SupplyVpos vdd gnd vsource dc=5
+// AnalysesOpPoint dc
+Sparams sp start=100M stop=100G dec=100
+
+* define passive 3-pole bandpass filter
+subckt filter (n1 n2)
+    parameters bw=1 r0=1 fc=1
+    checkFreqs paramtest errorif=((bw/2-fc)>=0)\
+    message="center frequency must be greater than half thebandwidth"
+    C1  (n1  0)   capacitor c=0.3374 / (6.2832 * bw * r0)
+    L1  (n1  0)   inductor l=(r0 * bw) / (0.3374 * 6.2832 * fc * fc)
+    C2  (n1  n12) capacitor c=bw / (0.9705 * 6.2832 * fc * fc * r0)
+    L2  (n12 n2)  inductor l=(r0 * 0.9705) / (6.2832 * bw)
+    C3  (n2  0)   capacitor c=2.2034 / (6.2832 * bw * r0)
+    L3  (n2  0)   inductor l=(r0 * bw) / (2.2034 * 6.2832 * fc * fc)
+ends filter

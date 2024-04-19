@@ -1,0 +1,7 @@
+module macro_use_reserved(x);
+
+analog function foo;
+    foo = TYPE == `nmos ? 7.45669e11 : 1.16645e12;
+endfunction
+
+endmodule

@@ -1,0 +1,10 @@
+* test scaling options
+
+.lib "jlpkg://Sky130PDK/sky130.lib.spice" tt
+
+X0 VDD VG 0 0 sky130_fd_pr__nfet_01v8 w=5 l=10 m=10
+V1 VDD 0 1.8
+Vg VG 0 sin(0.9 0.9 1e3)
+
+.tran 1u 2m
+.options acct noinit temp=25 reltol=1e-12

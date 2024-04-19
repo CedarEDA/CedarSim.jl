@@ -1,0 +1,13 @@
+module NLVCR(d, g, s);
+
+inout d, g, s;
+electrical d, g, s;
+parameter real R=1 exclude 0;
+
+real cdrain;
+
+analog begin
+    cdrain = R*V(g,s)**2;
+    I(d,s) <+ V(d,s)*ddx(cdrain, V(g,s));
+end
+endmodule

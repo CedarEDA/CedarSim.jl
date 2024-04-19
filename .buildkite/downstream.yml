@@ -1,0 +1,97 @@
+steps:
+  - wait: ~
+    depends_on: runtests-blessed
+
+  - group: ":arrow_right: Downstream testing"
+    notify:
+      - github_commit_status:
+          context: "Downstream"
+    steps:
+      - label: ":runner: SpectreNetlistParser"
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - JuliaCI/julia#v1: ~
+          - JuliaCI/julia-test#v1:
+                use_ssh: true
+                coverage: false
+                extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+                package: SpectreNetlistParser
+        agents:
+          os: "linux"
+          arch: "x86_64"
+
+      - label: ":runner: VerilogAParser"
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - JuliaCI/julia#v1: ~
+          - JuliaCI/julia-test#v1:
+                use_ssh: true
+                coverage: false
+                extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+                package: VerilogAParser
+        agents:
+          os: "linux"
+          arch: "x86_64"
+
+      - label: ":runner: BSIM4"
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+          - JuliaCI/julia#v1: ~
+          - JuliaCI/julia-test#v1:
+                use_ssh: true
+                run_tests: false
+                extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+          - staticfloat/metahook:
+              pre-command: |
+                echo "--- Clone BSIM4"
+                git clone git@github.com:JuliaComputing/BSIM4.va.git BSIM4
+
+                echo "--- Prepare BSIM4 to use the current version of all packages for testing"
+                JULIA_PKG_PRECOMPILE_AUTO=0 \
+                julia --project=BSIM4/test -e 'import Pkg; Pkg.instantiate(); \
+                                                           Pkg.develop(path="."); \
+                                                           Pkg.develop(path="./Lexers.jl"); \
+                                                           Pkg.develop(path="./SpectreNetlistParser.jl"); \
+                                                           Pkg.develop(path="./VerilogAParser.jl"); \
+                                                           Pkg.precompile();'
+        # Until https://github.com/JuliaLang/Pkg.jl/pull/3276 is fixed, run test script manually
+        # - JuliaCI/julia-test#v1:
+        #       use_ssh: true
+        #       extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+        #       package: BSIM4
+        commands: |
+          cd BSIM4/test
+          julia --project=. runtests.jl
+        agents:
+          os: "linux"
+          arch: "x86_64"
+
+      - label: ":runner: CedarTestcases.jl"
+        env:
+          GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
+        plugins:
+          - staticfloat/ssh-agent:
+              keyvars:
+                - "GITHUB_SSH_KEY"
+        commands: |
+          echo "--- Clone CedarTestcases.jl"
+          git clone git@github.com:JuliaComputing/CedarTestcases.jl.git CedarTestcases.jl
+
+          # Bootstrap the CedarTestcases dynamic job list
+          cd CedarTestcases.jl
+          buildkite-agent pipeline upload .buildkite/pipeline.yml
+        agents:
+          os: "linux"
+          arch: "x86_64"

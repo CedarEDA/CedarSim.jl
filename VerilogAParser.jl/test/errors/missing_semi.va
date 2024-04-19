@@ -1,0 +1,18 @@
+module MissingSemicolon(p, n);
+
+analog function missing_semicolon;
+    input a, b, c;
+    real a, b, c;
+
+    begin
+        missing_semicolon = a - b / c
+    end
+endfunction
+
+inout p, n;
+electrical p, n;
+
+analog begin
+    I(p,n) <+ 0;
+end
+endmodule

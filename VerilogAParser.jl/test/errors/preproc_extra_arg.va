@@ -1,0 +1,5 @@
+`define MPIcc(nam,def,uni,lwr,upr,des) (*units=uni, desc=des*) parameter integer nam=def from[lwr:upr] ;
+
+module preproc_extra_arg(p, n);
+    `MPIcc( BINUNIT        , 1,           , ""           , 0           , 1           , "Binning unit selector")
+endmodule

@@ -1,0 +1,23 @@
+`define MPIcc(nam,def,uni,lwr,upr,des) (*units=uni, desc=des*) parameter integer nam=def from[lwr:upr] ;
+`define MPRco(nam,def,uni,lwr,upr,des) (*units=uni, desc=des*) parameter real nam=def from[lwr:upr) ;
+`define MPRcc(nam,def,uni,lwr,upr,des) (*units=uni, desc=des*) parameter real nam=def from[lwr:upr] ;
+`define MPRnb(nam,def,uni,        des) (* units=uni, desc=des *) parameter real    nam=def;
+`define IPRnb(nam,def,uni,        des) (* units=uni, type="instance", desc=des *) parameter real    nam=def;
+`define IPIco(nam,def,uni,lwr,upr,des) (*units=uni, type="instance", desc=des*) parameter integer nam=def from[lwr:upr) ;
+`define IPRco(nam,def,uni,lwr,upr,des) (*units=uni, type="instance", desc=des*) parameter real nam=def from[lwr:upr) ;
+`define IMPIcc(nam,def,uni,lwr,upr,des) (*units=uni, type="both", desc=des*) parameter integer nam=def from[lwr:upr] ;
+`define IMPRnb(nam,def,uni,       des) (*units=uni, type="both", desc=des*) parameter real nam=def;
+`define Obs(name, des) (* desc = des *) real name;
+
+// TODO: Units and desc
+`define ScalePars(nam) \
+    parameter real L``nam=0.0; \
+    parameter real W``nam=0.0; \
+    parameter real P``nam=0.0;
+
+`define MPRnbS(nam,def,uni,        des) `MPRnbS(nam,def,uni,        des) `ScalePars(nam)
+`define MPRcoS(nam,def,uni,lwr,upr,des) `MPRcoS(nam,def,uni,lwr,upr,des) `ScalePars(nam)
+
+module recursive_macro(x);
+    `MPRnbS( AIGSD         , TYPE == `ntype ? 1.36e-2 : 9.8e-3, "√(Fs²/g)m⁻¹"       , "Parameter for Igs,d")
+endmodule

@@ -1,0 +1,19 @@
+module caseemi(a)
+    input a;
+
+    analog function CaseTest;
+
+    input p;
+    integer p;
+
+    case (p)
+        0: begin
+            CaseTest = 1;
+        end;
+        1: CaseTest = 2;
+        2: CaseTest = 3;
+        default: CaseTest = 4;
+    endcase
+
+    endfunction
+endmodule 

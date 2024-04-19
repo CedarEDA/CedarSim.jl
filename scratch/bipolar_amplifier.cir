@@ -1,0 +1,13 @@
+.title KiCad schematic
+.include "BC456B.lib"
+RLoad1 out 0 100k
+R2 Net-_Q1-B_ 0 10k
+Q1 Net-_Q1-C_ Net-_Q1-B_ 0 BC546B
+Vin1 vin 0 dc 0 sin(0 1m 500)
+Cin1 vin Net-_Q1-B_ 10u
+VCC1 vcc 0 5
+R1 vcc Net-_Q1-B_ 68k
+Cout1 Net-_Q1-C_ out 10u
+R3 vcc Net-_Q1-C_ 10k
+.tran 10u 10m
+.end

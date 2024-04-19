@@ -1,0 +1,4 @@
+[deps]
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+Sandbox = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
+Scratch = "6c6a2e73-6563-6170-7368-637461726353"

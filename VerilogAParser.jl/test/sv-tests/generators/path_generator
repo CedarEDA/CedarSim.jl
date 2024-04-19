@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020 The SymbiFlow Authors.
+#
+# Use of this source code is governed by a ISC-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/ISC
+#
+# SPDX-License-Identifier: ISC
+
+import os
+import sys
+import json
+import glob
+
+templ = """/*
+:name: {name}
+:description: Tests imported from {project}
+:files: {files}
+:incdirs: {incdirs}
+:tags: {project}
+{extra_tags}
+*/
+{extra_code}
+"""
+
+try:
+    third_party_dir = os.environ['THIRD_PARTY_DIR']
+    tests_dir = os.environ['TESTS_DIR']
+    conf_dir = os.environ['CONF_DIR']
+except KeyError:
+    print("Export the TESTS_DIR and CONF_DIR variables first")
+    sys.exit(1)
+
+name = ''
+project = ''
+paths = [[]]
+matches = []
+
+for cfg in glob.glob(os.path.join(conf_dir, 'generators', 'meta-path',
+                                  '*.json')):
+    with open(cfg, 'r') as jf:
+        global_extra_tags = []
+        extra_code = ""
+        data = json.load(jf)
+        name = data['name']
+        project = data['project']
+        if 'should_fail_because' in data:
+            global_extra_tags.append(
+                f":should_fail_because: {data['should_fail_because']}")
+        paths = data['paths']
+        matches = data['matches']
+        blacklist = data.get('blacklist', [''])
+        commons = data.get('commons', [])
+        incdirs = data.get('incdirs', [])
+        timeouts = data.get('timeouts', {})
+        if 'fake_topmodule' in data:
+            global_extra_tags.append(":top_module: top")
+            extra_code = "module top; endmodule"
+
+    test_dir = os.path.join(tests_dir, 'generated', project)
+
+    if not os.path.isdir(test_dir):
+        os.makedirs(test_dir, exist_ok=True)
+
+    for path in paths:
+        for match in matches:
+            for f in glob.glob(os.path.abspath(os.path.join(third_party_dir,
+                                                            *path, match))):
+
+                # make a copy of extra tags for a particular test
+                extra_tags = global_extra_tags[:]
+                basename = os.path.basename(f)
+                if blacklist.count(basename) > 0:
+                    print("Skipping blacklisted file: {}".format(f))
+                    continue
+
+                fname = name + '_' + os.path.basename(os.path.splitext(f)[0])
+                test_file = os.path.join(test_dir, fname + '.sv')
+
+                incs = os.path.dirname(f)
+
+                for common in commons:
+                    f = os.path.abspath(
+                        os.path.join(third_party_dir, common)) + " " + f
+
+                # add the test snippet do the beginning of the list
+                f = os.path.abspath(test_file) + " " + f
+
+                for incdir in incdirs:
+                    incs = os.path.abspath(
+                        os.path.join(third_party_dir, incdir)) + " " + incs
+
+                if basename in timeouts:
+                    extra_tags.append(f":timeout: {timeouts[basename]}")
+
+                extra_tags = "\n".join(extra_tags)
+
+                with open(test_file, "w") as sv:
+                    sv.write(
+                        templ.format(
+                            project=project,
+                            files=f,
+                            name=fname,
+                            incdirs=incs,
+                            extra_tags=extra_tags,
+                            extra_code=extra_code))

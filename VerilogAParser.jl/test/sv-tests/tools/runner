@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020 The SymbiFlow Authors.
+#
+# Use of this source code is governed by a ISC-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/ISC
+#
+# SPDX-License-Identifier: ISC
+
+import os
+import re
+import sys
+import json
+import shutil
+import logging
+import argparse
+import tempfile
+from datetime import datetime
+from importlib import import_module
+from logparser import parseLog
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("-r", "--runner", required=True)
+
+action = parser.add_mutually_exclusive_group(required=True)
+action.add_argument("-t", "--test")
+action.add_argument("-v", "--version", action="store_true")
+action.add_argument("-u", "--url", action="store_true")
+
+parser.add_argument("-o", "--out", required=True)
+parser.add_argument("-k", "--keep-tmp", action="store_true")
+
+parser.add_argument(
+    "-q",
+    "--quiet",
+    dest='verbosity',
+    action='store_const',
+    const=logging.ERROR,
+    default=logging.DEBUG)
+
+args = parser.parse_args()
+
+# setup logger
+logger = logging.getLogger()
+logger.setLevel(args.verbosity)
+
+ch = logging.StreamHandler()
+ch.setFormatter(logging.Formatter('%(levelname)-8s| %(message)s'))
+logger.addHandler(ch)
+
+runner_obj = None
+
+if 'RUNNERS_DIR' in os.environ:
+    sys.path.insert(1, os.path.abspath(os.environ['RUNNERS_DIR']))
+
+try:
+    module = import_module(args.runner)
+    runner_cls = getattr(module, args.runner)
+    runner_obj = runner_cls()
+except Exception as e:
+    logger.error("Unable to load runner module: {}".format(str(e)))
+    sys.exit(1)
+
+dirs = {}
+
+try:
+    dirs['out'] = os.environ['OUT_DIR']
+    dirs['conf'] = os.environ['CONF_DIR']
+    dirs['tests'] = os.environ['TESTS_DIR']
+    dirs['runners'] = os.environ['RUNNERS_DIR']
+    dirs['third_party'] = os.environ['THIRD_PARTY_DIR']
+except KeyError as e:
+    logger.error("Required environment variables missing: {}".format(str(e)))
+    sys.exit(1)
+
+new_path = [os.path.abspath(dirs['out'] + "/runners/bin/"), os.environ['PATH']]
+
+os.environ['PATH'] = ":".join(new_path)
+
+runner = os.path.abspath(os.path.join(dirs['runners'], args.runner))
+out = os.path.abspath(args.out)
+
+os.makedirs(os.path.dirname(out), exist_ok=True)
+
+if args.version:
+    version = runner_obj.get_version()
+    with open(out, "w") as f:
+        f.write(version)
+
+    sys.exit(0)
+
+if args.url:
+    url = runner_obj.get_url()
+    with open(out, "w") as f:
+        f.write(url)
+
+    sys.exit(0)
+
+libs_json = os.path.join(dirs['conf'], 'runners', 'libs.json')
+
+with open(libs_json, 'r') as jf:
+    try:
+        libs = json.load(jf)
+    except JSONDecodeError as e:
+        libs = {}
+
+test = os.path.abspath(os.path.join(dirs['tests'], args.test))
+
+# In addition to these fixed names, "runner_<tool>_flags" is allowed
+supported_test_params = [
+    "name", "tags", "description", "files", "incdirs", "top_module", "timeout",
+    "type", "should_fail", "should_fail_because", "defines",
+    "compatible-runners", "allow_elaboration"
+]
+
+test_params = {}
+
+# look for all supported params
+try:
+    with open(test) as f:
+        for l in f:
+            param = re.search(r"^:([a-zA-Z_-]+):\s*(.+)", l)
+
+            if param is None:
+                continue
+
+            param_name = param.group(1).lower()
+            param_value = param.group(2)
+
+            if param_name not in supported_test_params:
+                if not re.match(r'runner_.*_flags$', param_name):
+                    logger.warning(
+                        "Unsupported test param found: {} - ignoring".format(
+                            param_name))
+                    continue
+
+            test_params[param_name] = param_value
+
+            # check all items in the supported_test_params exists in the test_params.
+            if len(set(supported_test_params) - set(test_params.keys())) == 0:
+                # all supported parameters found
+                break
+
+        else:
+            # set default values for optional metadata entries
+            test_params.setdefault('files', test)
+            test_params.setdefault('incdirs', os.path.dirname(test))
+            test_params.setdefault('top_module', '')
+            test_params.setdefault('timeout', "30")
+            test_params.setdefault('type', 'parsing')
+            test_params.setdefault(
+                'should_fail',
+                ("0", "1")["should_fail_because" in test_params.keys()])
+            test_params.setdefault('should_fail_because', "")
+            test_params.setdefault('defines', "")
+            test_params.setdefault('compatible-runners', "all")
+            test_params.setdefault('allow_elaboration', "False")
+
+            if len(set(supported_test_params) - set(test_params.keys())) != 0:
+                missing = list(
+                    set(supported_test_params) - set(test_params.keys()))
+                logger.error(
+                    "Required parameters missing ({}) in {}".format(
+                        ", ".join(missing), args.test))
+                sys.exit(1)
+except Exception as e:
+    logger.error("Unable to parse test file: {}".format(str(e)))
+    sys.exit(1)
+
+# if the string is not empty and should_fail is 0
+# then set it to 1 and issue a warning
+if test_params["should_fail"] == "0" and test_params["should_fail_because"]:
+    test_params["should_fail"] = "1"
+    logger.warning("contradictory params should_fail, should_fail_because.")
+# if string is empty and should_fail is 1
+elif test_params[
+        "should_fail"] == "1" and not test_params["should_fail_because"]:
+    logger.warning(
+        "should_fail tag should be replaced with should_fail_because.")
+
+test_params['files'] = test_params['files'].split()
+test_params['incdirs'] = list(
+    map(
+        lambda x: os.path.abspath(os.path.join(dirs['tests'], x)),
+        test_params['incdirs'].split()))
+
+test_params['mode'] = runner_obj.get_mode(
+    test_params['type'].split(), test_params['compatible-runners'].split())
+if test_params['mode'] is None:
+    logger.info("Skipping {}/{}".format(args.runner, args.test))
+    with open(out, "w") as f:
+        f.write("")  # runner does not support mode; just mark file as handled.
+
+    sys.exit(0)
+
+for key in libs.keys():
+    if key in test_params['tags']:
+        test_params['files'] = [
+            os.path.abspath(os.path.join(dirs['third_party'], p))
+            for p in libs[key]['files']
+        ] + test_params['files']
+        test_params['incdirs'] = [
+            os.path.abspath(os.path.join(dirs['third_party'], p))
+            for p in libs[key]['incdirs']
+        ] + test_params['incdirs']
+
+test_params['defines'] = test_params['defines'].split()
+
+try:
+    tmp_dir = tempfile.mkdtemp()
+except (PermissionError, FileExistsError) as e:
+    logger.error(
+        "Unable to create a temporary directory for test: {}".format(str(e)))
+    sys.exit(1)
+
+try:
+    logger.info("Running {}/{}".format(args.runner, args.test))
+
+    output, rc, user_time, system_time, ram_usage = runner_obj.run(
+        tmp_dir, test_params)
+
+    tool_success = runner_obj.is_success_returncode(rc, test_params)
+    test_params['rc'] = rc
+    test_params['tool_success'] = "1" if tool_success else "0"
+    test_params['runner'] = runner_obj.name
+    test_params['runner_url'] = runner_obj.url
+    test_params['time_elapsed'] = str(user_time + system_time)
+    test_params['user_time'] = user_time
+    test_params['system_time'] = system_time
+    test_params['ram_usage'] = ram_usage
+    test_params['date_completed'] = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S")
+
+    tool_should_fail = test_params["should_fail"] == "1"
+    tool_failed = not tool_success
+    tool_crashed = rc >= 126
+
+    test_passed = not tool_crashed and tool_should_fail == tool_failed
+
+    if test_passed and test_params['mode'] == 'simulation':
+        test_passed = parseLog(output)
+
+    if test_passed:
+        logger.info("PASS: {}/{}".format(args.runner, args.test))
+    else:
+        logger.warning("FAIL: {}/{}".format(args.runner, args.test))
+
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+
+    test_params['files'] = ' '.join(test_params['files'])
+    test_params['incdirs'] = ' '.join(test_params['incdirs'])
+    test_params['defines'] = ' '.join(test_params['defines'])
+
+    with open(out, "w") as log:
+        # start by writing params
+        for p in test_params:
+            log.write("{}: {}\n".format(p, test_params[p]))
+        log.write("\n")
+        log.write(output)
+except Exception as e:
+    logger.error(
+        "Unable to test {} using {}: {}".format(
+            args.runner, args.test, str(e)))
+    sys.exit(1)
+finally:
+    if args.keep_tmp:
+        logger.info(
+            "{}/{} work directory was left for inspection {}".format(
+                args.runner, args.test, tmp_dir))
+    else:
+        shutil.rmtree(tmp_dir)

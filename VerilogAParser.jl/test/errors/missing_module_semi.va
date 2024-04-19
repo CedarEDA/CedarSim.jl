@@ -1,0 +1,8 @@
+module missing_module_semi(p, n)
+    inout p, n;
+    electrical p, n;
+
+    analog begin
+        I(p,n) <+ 0;
+    end
+endmodule
