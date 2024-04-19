@@ -9,9 +9,9 @@ using SpectreNetlistParser
 using CedarSim.SpectreEnvironment
 using Test
 using SciMLBase
+import Pkg, CMC
 
-const bsimcmg_path = joinpath(dirname(pathof(VerilogAParser)),
-    "../cmc_models/bsimcmg107/bsimcmg.va")
+const bsimcmg_path = joinpath(Pkg.pkgdir(CMC), "cmc_models/bsimcmg107/bsimcmg.va")
 const bsimcmg = load_VA_model(bsimcmg_path)
 
 sa = SpectreNetlistParser.parsefile(joinpath(dirname(pathof(SpectreNetlistParser)), "../test/examples/7nm_TT.scs"));

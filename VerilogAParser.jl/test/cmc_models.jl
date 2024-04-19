@@ -1,6 +1,6 @@
-using VerilogAParser
+import VerilogAParser, Pkg, CMC
 
-const cmc_dir = joinpath(@__DIR__, "..", "cmc_models")
+const cmc_dir = joinpath(Pkg.pkgdir(CMC), "cmc_models")
 
 models = [
     "BSIM-IMG_102.9.2_20181220/code/bsimimg.va",

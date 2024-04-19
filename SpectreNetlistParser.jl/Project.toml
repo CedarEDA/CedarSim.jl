@@ -14,7 +14,7 @@ SnoopPrecompile = "66db9d55-30c0-4569-8b51-7e840670fc0c"
 [compat]
 AbstractTrees = "v0.4.1"
 julia = "1.9"
-Lexers = "0.3"
+Lexers = "≥ 0.3"
 
 [extras]
 DeepDiffs = "ab62b9b5-e342-54a8-a765-a90f495de1a6"

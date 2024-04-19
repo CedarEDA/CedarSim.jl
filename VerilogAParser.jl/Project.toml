@@ -18,7 +18,8 @@ AbstractTrees = "v0.4.1"
 julia = "1"
 
 [extras]
+CMC = "db13d295-e716-48aa-bdca-f6cce3d4ecc6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["CMC", "Test"]
