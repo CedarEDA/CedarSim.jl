@@ -1,7 +1,7 @@
-import VerilogAParser, Pkg, CMC
+import VerilogAParser, CMC
 using AbstractTrees
 
-va = VerilogAParser.parsefile(joinpath(Pkg.pkgdir(CMC), "cmc_models/bsimcmg110/bsimcmg.va"));
+va = VerilogAParser.parsefile(joinpath(Base.pkgdir(CMC), "cmc_models/bsimcmg110/bsimcmg.va"));
 
 using VerilogAParser.VerilogACSTParser: virtrange
 
@@ -13,7 +13,7 @@ end
 
 # 107
 
-va = VerilogAParser.parsefile(joinpath(Pkg.pkgdir(CMC), "cmc_models/bsimcmg107/bsimcmg.va"));
+va = VerilogAParser.parsefile(joinpath(Base.pkgdir(CMC), "cmc_models/bsimcmg107/bsimcmg.va"));
 
 ls = collect(Leaves(VerilogAParser.VerilogACSTParser.ChunkTree(va.ps)))
 
