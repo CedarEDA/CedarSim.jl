@@ -21,10 +21,10 @@ end
 
 struct IRSimulator
     spec::SimSpec
-    scope::Union{DScope, Nothing}
+    scope::DScope
 end
 
-const debug_scope = ScopedValue{Union{AbstractScope, Nothing}}(nothing)
+const debug_scope = ScopedValue{AbstractScope}(DScope())
 const spec = ScopedValue{SimSpec}(SimSpec())
 const sim_mode = ScopedValue{Symbol}(:dcop)
 
@@ -53,7 +53,7 @@ struct Net{T} <: AbstractNet
         return new{T}(net.V, net.kcl!, multiplier)
     end
 end
-Net(name::Symbol) = Net(DScope(nothing, name))
+Net(name::Symbol) = Net(DScope(DScope(), name))
 Net(name::String) = Net(Symbol(name))
 
 kcl!(net::AbstractNet, current) = net.kcl!(net.multiplier * current)

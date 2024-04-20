@@ -20,8 +20,8 @@ fn = eval(circuit_code);
 # test aliasmap
 map = CedarSim.aliasmap(fn)
 ref = Dict{CedarSim.DScope, CedarSim.DScope}(
-    CedarSim.DScope(CedarSim.DScope(nothing, :x1), :node_pos) => CedarSim.DScope(nothing, :node_vcc),
-    CedarSim.DScope(CedarSim.DScope(nothing, :x1), :node_neg) => CedarSim.DScope(nothing, :node_0),
+    CedarSim.DScope(CedarSim.DScope(CedarSim.DScope(), :x1), :node_pos) => CedarSim.DScope(CedarSim.DScope(), :node_vcc),
+    CedarSim.DScope(CedarSim.DScope(CedarSim.DScope(), :x1), :node_neg) => CedarSim.DScope(CedarSim.DScope(), :node_0),
 )
 @test map == ref
 

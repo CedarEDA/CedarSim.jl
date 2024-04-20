@@ -19,7 +19,7 @@ DefaultSim{C}(circuit::C) where {C} = DefaultSim(circuit, :tran)
 
 function (sim::DefaultSim)()
     circuit′ = getfield(sim, :circuit)
-    with(spec=>SimSpec(time=DAECompiler.sim_time()), sim_mode=>sim.mode, debug_scope=>nothing) do
+    with(spec=>SimSpec(time=DAECompiler.sim_time()), sim_mode=>sim.mode, debug_scope=>DScope()) do
         return circuit′()
     end
 end
@@ -91,7 +91,7 @@ ParamSim(ps::ParamSim; kwargs...) = ParamSim(ps.circuit; mode=ps.mode, ps.spec..
 # parameters as a first argument.
 function (sim::ParamSim)()
     new_spec = SimSpec(;time=DAECompiler.sim_time(), sim.spec...)
-    return with(spec => new_spec, sim_mode => sim.mode, debug_scope=>nothing) do
+    return with(spec => new_spec, sim_mode => sim.mode, debug_scope=>DScope()) do
         sim.circuit(ParamLens(sim.params))
     end
 end
