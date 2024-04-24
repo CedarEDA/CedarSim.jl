@@ -19,11 +19,6 @@ Base.@kwdef struct SimSpec
     rng::Union{#=Random.Xoshiro,=# Nothing}=nothing
 end
 
-struct IRSimulator
-    spec::SimSpec
-    scope::DScope
-end
-
 const debug_scope = ScopedValue{AbstractScope}(DScope())
 const spec = ScopedValue{SimSpec}(SimSpec())
 const sim_mode = ScopedValue{Symbol}(:dcop)
