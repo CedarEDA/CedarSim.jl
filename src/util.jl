@@ -222,6 +222,10 @@ function default_name_map(sys)
     # Strip `node_` from the front if there's no conflicting other node:
     name_map = Dict{Symbol,String}()
     for name in top_level_nodes
+        # Only allow variables and observed
+        level = getfield(sys, :result).names[name]
+        (level.var !== nothing || level.obs !== nothing) || continue
+
         str_name = string(name)
         if startswith(str_name, "node_") && str_name[6:end] ∉ top_level_nodes
             str_name = string(str_name[6:end])

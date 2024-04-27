@@ -106,7 +106,7 @@ function noise_exp(sol, sys)
     result = getfield(sys, :result)
     pwr = Vector{T}(undef, result.neps)
     exp = Vector{T}(undef, result.neps)
-    noise_exp(pwr, exp, result.eps_names, sys)
+    noise_exp(pwr, exp, result.names, sys)
     @assert length(pwr) == length(exp)
     pwridxs = isa.(pwr, DAECompiler.ScopeRef)
     expidxs = isa.(exp, DAECompiler.ScopeRef)
@@ -118,21 +118,20 @@ function noise_exp(sol, sys)
     exp[expidxs] = rec[length(pwrrefs)+1:end]
     return convert(Vector{Float64}, pwr), convert(Vector{Float64}, exp)
 end
-function noise_exp(pwr, exp, eps, scope)
-    for (k, v) in pairs(eps)
-        if isa(v, Dict)
-            noise_exp(pwr, exp, v, getproperty(scope, k))
+function noise_exp(pwr, exp, names, scope)
+    for (k, v) in pairs(names)
+        if v.children !== nothing
+            noise_exp(pwr, exp, v.children, getproperty(scope, k))
+        end
+        v.eps !== nothing || continue
+        expk = Symbol(k, :exp)
+        pwrk = Symbol(k, :pwr)
+        @assert hasproperty(scope, pwrk)
+        pwr[v.eps] = getproperty(scope, pwrk)
+        if hasproperty(scope, expk)
+            exp[v.eps] = getproperty(scope, expk)
         else
-            expk = Symbol(k, :exp)
-            pwrk = Symbol(k, :pwr)
-            @assert isa(v, Integer)
-            @assert hasproperty(scope, pwrk)
-            pwr[v] = getproperty(scope, pwrk)
-            if hasproperty(scope, expk)
-                exp[v] = getproperty(scope, expk)
-            else
-                exp[v] = 0.
-            end
+            exp[v.eps] = 0.
         end
     end
 end
@@ -143,7 +142,7 @@ function NoiseSol(sol::SciMLBase.AbstractODESolution)
 
     M = prob.f.mass_matrix
     tsys = DAECompiler.get_transformed_sys(sol)
-    num_epsilons = tsys.state.neps 
+    num_epsilons = tsys.state.neps
     num_eqs = length(prob.u0)
 
     Jε = zeros(num_eqs, num_epsilons)
