@@ -1,6 +1,6 @@
 name = "CedarSim"
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
-version = "0.11.1"
+version = "0.11.2"
 authors = ["JuliaHub, Inc. and other contributors"]
 
 [workspace]
