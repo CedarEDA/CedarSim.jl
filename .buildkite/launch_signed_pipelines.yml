@@ -1,0 +1,24 @@
+---
+steps:
+  - label: ":closed_lock_with_key: Launch signed pipelines"
+    plugins:
+      - staticfloat/cryptic#v2:
+          signed_pipelines:
+            - pipeline: .buildkite/build_julia.yml
+              signature_file: .buildkite/build_julia.yml.signature
+              inputs:
+                - contrib/julia_build/Project.toml
+                - contrib/julia_build/Manifest.toml
+                - contrib/julia_build/ci_build.jl
+                - contrib/julia_build/Makefile
+                - contrib/julia_build/julia_version.inc
+                - contrib/julia_build/codesign.sh
+                - contrib/julia_build/buildkite_pipeline_insert_env.yml
+            - pipeline: .buildkite/documentation.yml
+              signature_file: .buildkite/documentation.yml.signature
+    command: "true"
+    env:
+      BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
+    agents:
+      cryptic_capable: true
+      os: "linux"

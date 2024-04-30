@@ -1,0 +1,83 @@
+steps:
+  - group: ":book: Docs"
+    depends_on: build-blessed-linux-x86_64
+    notify:
+      - github_commit_status:
+          context: "Docs"
+    steps:
+      - label: ":book: CedarSim documentation"
+        env:
+          BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
+        plugins:
+          - staticfloat/cryptic#v2:
+              files:
+                - .buildkite/secrets/documenter_base64_rsa
+          - JuliaCI/julia#v1:
+              version: "https://jc-cedarsim-juliabuilds.s3.amazonaws.com/vanilla/julia-latest-linux-x86_64.tar.gz"
+        commands: |
+          echo "--- Configuring deploy key"
+          export DOCUMENTER_KEY=""
+          keyfile=.buildkite/secrets/documenter_base64_rsa
+          if [[ -f $${keyfile} ]]; then
+            if [[ "$${BUILDKITE_PULL_REQUEST}" == "false" && "$${BUILDKITE_BRANCH}" == "main" ]]; then
+                DOCUMENTER_KEY="$(head -n1 $${keyfile})"
+                echo "Documenter deploy key available"
+            else
+                echo "Documenter deploy key *not* available (this is a pull request build or branch build other than main)"
+            fi
+            shred -u $${keyfile}
+          fi
+          if [[ -f $${keyfile} ]]; then exit 1; fi
+          echo "--- Instantiating project"
+          julia -e 'import Pkg; Pkg.Registry.add(url="https://github.com/CedarEDA/PublicRegistry.git")'
+          # export JULIA_PKG_PRECOMPILE_AUTO=0 # TODO: Remove this once failure are figured out.
+          julia --project=docs -e 'import Pkg; Pkg.instantiate()'
+          echo "+++ Building and deploying"
+          julia --project=docs docs/make.jl
+        if: build.message !~ /\[skip docs build\]/
+        concurrency: 1
+        concurrency_group: 'cedarsim/docs_deploy'
+        timeout_in_minutes: 120
+        agents:
+          os: "linux"
+          arch: "x86_64"
+
+      - label: ":book: {{matrix}} documentation"
+        matrix:
+          - "SpectreNetlistParser.jl"
+          - "VerilogAParser.jl"
+        env:
+          BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
+        plugins:
+          - staticfloat/cryptic#v2:
+              files:
+                - .buildkite/secrets/documenter_base64_rsa
+          - JuliaCI/julia#v1:
+              version: "https://jc-cedarsim-juliabuilds.s3.amazonaws.com/vanilla/julia-latest-linux-x86_64.tar.gz"
+        commands: |
+          echo "--- Configuring deploy key"
+          export DOCUMENTER_KEY=""
+          keyfile=.buildkite/secrets/documenter_base64_rsa
+          if [[ -f $${keyfile} ]]; then
+            if [[ "$${BUILDKITE_PULL_REQUEST}" == "false" && "$${BUILDKITE_BRANCH}" == "main" ]]; then
+                DOCUMENTER_KEY="$(head -n1 $${keyfile})"
+                echo "Documenter deploy key available"
+            else
+                echo "Documenter deploy key *not* available (this is a pull request build or branch build other than main)"
+            fi
+            shred -u $${keyfile}
+          fi
+          if [[ -f $${keyfile} ]]; then exit 1; fi
+          echo "--- Instantiating project"
+          julia -e 'import Pkg; Pkg.Registry.add(url="https://github.com/CedarEDA/PublicRegistry.git")'
+          # export JULIA_PKG_PRECOMPILE_AUTO=0 # TODO: Remove this once failure are figured out.
+          julia --project={{matrix}}/docs -e 'import Pkg; Pkg.instantiate()'
+          echo "+++ Building and deploying"
+          julia --project={{matrix}}/docs {{matrix}}/docs/make.jl
+        if: build.message !~ /\[skip docs build\]/
+        concurrency: 1
+        concurrency_group: 'cedarsim/docs_deploy'
+        timeout_in_minutes: 120
+        agents:
+          os: "linux"
+          arch: "x86_64"

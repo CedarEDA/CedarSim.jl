@@ -1,22 +1,78 @@
 steps:
-  - label: ":rocket: launch pipelines"
+  - group: ":evergreen_tree: :electron: Cedar"
+    depends_on: build-blessed-linux-x86_64
+    notify:
+      - github_commit_status:
+          context: "Tests"
+    steps:
+      - label: ":evergreen_tree: :test_tube: Test the package"
+        key: runtests-blessed
+        # depends_on: build-blessed-linux-x86_64
+        plugins:
+          - JuliaCI/julia#v1: ~
+          - JuliaCI/julia-test#v1:
+              coverage: false
+              allow_reresolve: false
+              extra_registries: https://github.com/CedarEDA/PublicRegistry.git
+          - staticfloat/metahook:
+              # Compress all of our `.ir` files into a single tarball:
+              pre-artifact: |
+                tar -C test/ir -czf test/ir.tar.gz . || true
+        agents:
+          os: "linux"
+          arch: "x86_64"
+        if: build.message !~ /\[skip tests\]/
+        timeout_in_minutes: 240
+        artifact_paths:
+          - "test/ir.tar.gz"
+          - "test/plots/*.html"
+          - "test/plots/*.png"
+          - "test/plots/*.csv"
+
+      - label: ":evergreen_tree: :straight_ruler: Run benchmarks"
+        # depends_on: build-blessed-linux-x86_64
+        plugins:
+          - JuliaCI/julia#v1: ~
+        commands: |
+          echo "--- Prepare dependencies"
+          apt update && apt install -y make
+          julia -e 'import Pkg; Pkg.Registry.add(url = "https://github.com/CedarEDA/PublicRegistry.git")'
+          julia --project                    -e 'import Pkg; Pkg.instantiate()'
+          julia --project=scratch/benchmarks -e 'import Pkg; Pkg.instantiate()'
+          echo "+++ Run benchmarks"
+          make -j$(nproc) --output-sync -C scratch/benchmarks
+          tar -czvf scratch/benchmarks/output/ir.tar.gz scratch/benchmarks/output/ir
+        agents:
+          os: "linux"
+          arch: "x86_64"
+        if: build.message !~ /\[skip tests\]/
+        timeout_in_minutes: 180
+        artifact_paths:
+          - "scratch/benchmarks/output/*"
+          - "scratch/benchmarks/output_stats/*"
+
+  # Keep outside of the group, until buildkite fixes their notification reporting to be logical-and-except-soft_fail
+  - label: ":evergreen_tree: :git: Test the package on julia master"
+    # depends_on: build-blessed-linux-x86_64
+    soft_fail: true
     plugins:
-      - staticfloat/ssh-agent:
-          keyvars:
-            - "GITHUB_SSH_KEY"
-      - staticfloat/cryptic#v2:
-          signed_pipelines:
-            - pipeline: .buildkite/build_julia.yml
-              signature_file: .buildkite/build_julia.yml.signature
-            - pipeline: .buildkite/docs.yml
-              signature_file: .buildkite/docs.yml.signature
-          unsigned_pipelines:
-            - .buildkite/downstream.yml
-            - .buildkite/cedar_tests.yml
-    env:
-      GITHUB_SSH_KEY: ${GITHUB_SSH_KEY?}
-      BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET: ${BUILDKITE_PLUGIN_CRYPTIC_BASE64_SIGNED_JOB_ID_SECRET?}
-    command: true
+      # This one just installs the nightly, to track whether things are broken on nightly.
+      - JuliaCI/julia#v1:
+          version: nightly
+      - JuliaCI/julia-test#v1:
+          coverage: false
+          extra_registries: https://github.com/CedarEDA/PublicRegistry.git
+      - staticfloat/metahook:
+          # Compress all of our `.ir` files into a single tarball:
+          pre-artifact: |
+            tar -C test/ir -czf test/ir.tar.gz . || true
     agents:
-      cryptic_capable: true
-      os: linux
+      os: "linux"
+      arch: "x86_64"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 240
+    artifact_paths:
+      - "test/ir.tar.gz"
+      - "test/plots/*.html"
+      - "test/plots/*.png"
+      - "test/plots/*.csv"

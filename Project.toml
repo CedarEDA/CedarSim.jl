@@ -4,7 +4,7 @@ version = "0.11.0"
 authors = ["JuliaHub, Inc. and other contributors"]
 
 [workspace]
-projects = ["docs", "SpectreNetlistParser.jl", "VerilogAParser.jl"]
+projects = ["docs", "test", "SpectreNetlistParser.jl", "VerilogAParser.jl"]
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -68,7 +68,7 @@ CedarSimReviseExt = "Revise"
 ASAP7PDK = "0.2.1"
 AbstractAlgebra = "0.31.1"
 AbstractTrees = "0.4.1"
-BSIM4 = "0.4.0"
+BSIM4 = "0.5"
 BenchmarkTools = "1.4.0"
 CMC = "≥ 0.2.0"
 CSTParser = "3.4.1"
@@ -84,7 +84,7 @@ Diffractor = "0.2.8"
 DynamicScope = "0.1.2"
 ExprTools = "0.1.10"
 ForwardDiff = "0.10.36"
-GF180MCUPDK = "0.3.0"
+GF180MCUPDK = "0.4"
 LinearSolve = "2.23.0"
 NonlinearSolve = "3.5.3"
 OrdinaryDiffEq = "6.70.1"
@@ -92,7 +92,7 @@ PlotlyLight = "0.6.4"
 SciMLBase = "2.19.1"
 SciMLNLSolve = "0.1.4"
 SciMLSensitivity = "7.56.2"
-Sky130PDK = "0.3.1"
+Sky130PDK = "0.4"
 SpectreNetlistParser = "≥ 0.5"
 Sundials = "4.20.1"
 SymbolicIndexingInterface = "0.3.15"

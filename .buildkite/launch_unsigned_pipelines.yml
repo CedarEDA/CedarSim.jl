@@ -1,0 +1,8 @@
+---
+steps:
+  - label: ":unlock: Launch unsigned pipelines"
+    command: |
+      buildkite-agent pipeline upload .buildkite/runtests.yml
+      buildkite-agent pipeline upload .buildkite/downstream.yml
+    agents:
+      os: "linux"
