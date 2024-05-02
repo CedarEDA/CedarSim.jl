@@ -22,10 +22,10 @@ function parse(str::AbstractString; offset=0, kwargs...)
     seek(io, offset)
     return parse(io; kwargs...)
 end
-parsefile(fname::AbstractString, kwargs...) = parse(String(open(read, fname)); fname, kwargs...)
+parsefile(fname::AbstractString; kwargs...) = parse(String(open(read, fname)); fname, kwargs...)
 
-function parse(io::IOBuffer; fname=nothing, return_on_language_change::Bool=false)
-    return parse(ParseState(io; fname, return_on_language_change))
+function parse(io::IOBuffer; fname=nothing, return_on_language_change::Bool=false, implicit_title::Bool=true)
+    return parse(ParseState(io; fname, return_on_language_change, implicit_title))
 end
 
 function parse(ps::ParseState)

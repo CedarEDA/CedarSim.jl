@@ -45,10 +45,9 @@ function ParseState(srcfile::SrcFile; return_on_language_change::Bool, enable_ju
         false,
         false,
         return_on_language_change)
+    get_next_token(ps)
     next(ps)
     next(ps)
-    next(ps)
-    ps.started = true
     return ps
 end
 
@@ -81,9 +80,10 @@ end
 
 # This is kind of a mess...
 function get_next_action_token(ps::ParseState, tok=get_next_token(ps))
-    while kind(tok) == WHITESPACE || kind(tok) == COMMENT || kind(tok) == ESCD_NEWLINE
+    while kind(tok) == WHITESPACE || kind(tok) == COMMENT || kind(tok) == ESCD_NEWLINE || (kind(tok) == NEWLINE && !ps.started)
         tok = get_next_token(ps)
     end
+    ps.started = true
 
     if kind(tok) == NEWLINE
         while kind(ps.tok_storage) == WHITESPACE

@@ -226,6 +226,38 @@ title = """
 # TODO: This introduces an extra space in round tripping
 SPICENetlistParser.SPICENetlistCSTParser.parse(title)
 
+missing_implicit_title = """
+v1 vcc 0 DC 5
+r1 vcc n1 1k
+l1 n1 n2 1m
+c1 n2 0 1u
+"""
+ast = SPICENetlistParser.SPICENetlistCSTParser.parse(missing_implicit_title)
+@test ast.expr.form.stmts[1].form isa SPICENetlistParser.SPICENetlistCSTParser.Title
+@test ast.expr.form.stmts[2].form isa SPICENetlistParser.SPICENetlistCSTParser.Resistor
+
+# A blank newline should count as an empty title
+empty_implicit_title = """
+
+v1 vcc 0 DC 5
+r1 vcc n1 1k
+l1 n1 n2 1m
+c1 n2 0 1u
+"""
+ast = SPICENetlistParser.SPICENetlistCSTParser.parse(empty_implicit_title)
+@test ast.expr.form.stmts[1].form isa SPICENetlistParser.SPICENetlistCSTParser.Title
+@test ast.expr.form.stmts[2].form isa SPICENetlistParser.SPICENetlistCSTParser.Voltage
+
+# Leading whitespace should be accepted & ignored if no implicit title is expected
+no_implicit_title = """
+
+v1 vcc 0 DC 5
+r1 vcc n1 1k
+l1 n1 n2 1m
+c1 n2 0 1u
+"""
+ast = SPICENetlistParser.SPICENetlistCSTParser.parse(no_implicit_title; implicit_title=false)
+@test ast.expr.form.stmts[1].form isa SPICENetlistParser.SPICENetlistCSTParser.Voltage
 
 # Test error
 faulty = """

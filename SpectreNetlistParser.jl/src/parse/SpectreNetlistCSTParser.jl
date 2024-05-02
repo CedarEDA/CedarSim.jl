@@ -21,7 +21,7 @@ function parse(str::AbstractString; offset=0, kwargs...)
     seek(io, offset)
     return parse(io; kwargs...)
 end
-parsefile(fname::AbstractString, kwargs...) = parse(String(open(read, fname)); fname, kwargs...)
+parsefile(fname::AbstractString; kwargs...) = parse(String(open(read, fname)); fname, kwargs...)
 
 function parse(io::IOBuffer; fname=nothing, start_lang=nothing, enable_julia_escape::Bool=false, implicit_title::Bool=true)
     if start_lang === nothing

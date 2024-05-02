@@ -28,9 +28,8 @@ function ParseState(io::IOBuffer; fname = nothing, enable_julia_escape::Bool=fal
         false,
         false,
         false)
+    get_next_token(ps)
     next(ps)
-    next(ps)
-    ps.started = true
     return ps
 end
 
@@ -43,9 +42,8 @@ function reinit_at_pos!(ps::ParseState, p)
     ps.tok_storage = Token(ERROR)
     ps.t = Token(ERROR)
     ps.nt = Token(ERROR)
+    get_next_token(ps)
     next(ps)
-    next(ps)
-    ps.started=true
     return ps
 end
 
@@ -71,13 +69,10 @@ end
 
 # This is kind of a mess...
 function get_next_action_token(ps::ParseState, tok=get_next_token(ps))
-    while kind(tok) == WHITESPACE || kind(tok) == COMMENT || kind(tok) == ESCD_NEWLINE || kind(tok) == NEWLINE
-        if ps.started && kind(tok) == NEWLINE
-            break
-        else
-            tok = get_next_token(ps)
-        end
+    while kind(tok) == WHITESPACE || kind(tok) == COMMENT || kind(tok) == ESCD_NEWLINE || (kind(tok) == NEWLINE && !ps.started)
+        tok = get_next_token(ps)
     end
+    ps.started=true
 
     if kind(tok) == NEWLINE
         while kind(ps.tok_storage) == WHITESPACE

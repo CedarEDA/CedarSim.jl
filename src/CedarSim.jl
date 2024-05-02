@@ -56,6 +56,7 @@ end
 using PrecompileTools
 @setup_workload let
     spice = """
+    * my circuit
     v1 vcc 0 DC 5
     r1 vcc n1 1k
     l1 n1 n2 1m

@@ -1368,7 +1368,7 @@ function source_body(n::SNode{<:SC.AbstractBlockASTNode},
                 push!(kwargs[:includes], mod)
             else
                 ispdk, path = resolve_includepath(str, to_julia.includepaths, to_julia.pdkincludepaths)
-                sa = SpectreNetlistParser.parsefile(path);
+                sa = SpectreNetlistParser.parsefile(path; implicit_title=false);
                 inc_to_julia = setproperties(to_julia,
                     includepaths=[dirname(path), to_julia.includepaths...],
                     is_circuit=to_julia.is_circuit && !ispdk)
@@ -1436,7 +1436,7 @@ function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kw
                 push!(kwargs[:includes], mod)
             else
                 ispdk, path = resolve_includepath(str, to_julia.includepaths, to_julia.pdkincludepaths)
-                sa = get!(() -> SP.parsefile(path), to_julia.parsed_files, path)  # SPICE, Sprectre??
+                sa = get!(() -> SP.parsefile(path; implicit_title=false), to_julia.parsed_files, path)  # SPICE, Sprectre??
                 inc_to_julia = setproperties(to_julia,
                     includepaths=[dirname(path), to_julia.includepaths...],
                     is_circuit=to_julia.is_circuit && !ispdk)
@@ -1450,7 +1450,7 @@ function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kw
             else
                 ispdk, path = resolve_includepath(str, to_julia.includepaths, to_julia.pdkincludepaths)
                 section = String(stmt.name)
-                p = get!(() -> SP.parsefile(path), to_julia.parsed_files, path)
+                p = get!(() -> SP.parsefile(path; implicit_title=false), to_julia.parsed_files, path)
                 if (path, section) in to_julia.libraries
                     continue
                 end
@@ -1691,7 +1691,7 @@ export SpcFile
 function Base.include(mod::Module, file::SpcFile)
     include_paths = [dirname(abspath(file.file)), pwd()]
     pdk, fname = resolve_includepath(file.file, include_paths)
-    sa = SpectreNetlistParser.parsefile(fname)
+    sa = SpectreNetlistParser.parsefile(fname; implicit_title=false)
     s = gensym()
     netlist = CedarSim.make_spectre_netlist(sa, include_paths)
     if file.raw
