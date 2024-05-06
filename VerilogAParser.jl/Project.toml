@@ -1,7 +1,7 @@
 name = "VerilogAParser"
 uuid = "b333aca1-b97d-47c9-9908-8e5a8c115e58"
 authors = ["JuliaHub, Inc. and other contributors"]
-version = "0.3.0"
+version = "0.3.1"
 
 [workspace]
 projects = ["docs"]

@@ -1,7 +1,7 @@
 name = "SpectreNetlistParser"
 uuid = "72c5b8b4-6eac-4a9c-9647-0f5a982ce801"
 authors = ["JuliaHub, Inc. and other contributors"]
-version = "0.6.0"
+version = "0.6.1"
 
 [workspace]
 projects = ["docs"]
