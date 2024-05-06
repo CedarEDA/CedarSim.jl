@@ -2,7 +2,7 @@
 
 julia_version = "1.12.0-DEV"
 manifest_format = "2.0"
-project_hash = "d0d9ee8223a116c671813d6a4badc47f215dbcaa"
+project_hash = "0861ec0f596ffbb5903ec3d968569c5126890155"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "016833eb52ba2d6bea9fcb50ca295980e728ee24"
@@ -210,7 +210,7 @@ version = "0.1.10"
 deps = ["ADTypes", "AbstractAlgebra", "AbstractTrees", "Accessors", "AxisKeys", "CassetteOverlay", "ChainRules", "ChainRulesCore", "Combinatorics", "Compat", "DAECompiler", "DecFP", "DescriptorSystems", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DynamicScope", "ExprTools", "ForwardDiff", "Lexers", "LinearAlgebra", "LinearSolve", "Logging", "ModelingToolkit", "NLsolve", "NaNMath", "NonlinearSolve", "OrderedCollections", "OrdinaryDiffEq", "PrecompileTools", "Random", "SciMLBase", "SciMLNLSolve", "SciMLSensitivity", "Scratch", "SpectreNetlistParser", "StaticArrays", "StructArrays", "Sundials", "SymbolicIndexingInterface", "VT100", "VectorPrisms", "VerilogAParser"]
 path = "."
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
-version = "0.11.2"
+version = "0.11.3"
 
     [deps.CedarSim.extensions]
     CedarSimCSVExt = "CSV"
@@ -858,11 +858,6 @@ git-tree-sha1 = "e00e2b013f3bd98d3789f889b9305c1546ecd1ab"
 uuid = "70703baa-626e-46a2-a12c-08ffd08c73b4"
 version = "0.4.8"
 
-[[deps.JuliaSyntaxHighlighting]]
-deps = ["StyledStrings"]
-uuid = "dc6e5ff7-fb65-4e79-a425-ec3bc9c03011"
-version = "1.11.0"
-
 [[deps.JumpProcesses]]
 deps = ["ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "FunctionWrappers", "Graphs", "LinearAlgebra", "Markdown", "PoissonRandom", "Random", "RandomNumbers", "RecursiveArrayTools", "Reexport", "SciMLBase", "StaticArrays", "SymbolicIndexingInterface", "UnPack"]
 git-tree-sha1 = "ed08d89318be7d625613f3c435d1f6678fba4850"
@@ -1142,7 +1137,7 @@ uuid = "299715c1-40a9-479a-aaf9-4a633d36f717"
 version = "0.1.9"
 
 [[deps.Markdown]]
-deps = ["Base64", "JuliaSyntaxHighlighting", "StyledStrings"]
+deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 version = "1.11.0"
 
@@ -1329,7 +1324,7 @@ weakdeps = ["Adapt"]
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.27+1"
+version = "0.3.26+2"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1791,7 +1786,7 @@ weakdeps = ["ChainRulesCore"]
 deps = ["AbstractTrees", "Lexers", "SnoopPrecompile"]
 path = "SpectreNetlistParser.jl"
 uuid = "72c5b8b4-6eac-4a9c-9647-0f5a982ce801"
-version = "0.6.0"
+version = "0.6.1"
 
 [[deps.StateSelection]]
 deps = ["DocStringExtensions", "FindFirstFunctions", "Graphs", "LinearAlgebra", "Setfield", "SparseArrays", "UnPack"]
@@ -2151,7 +2146,7 @@ version = "0.21.67"
 deps = ["AbstractTrees", "Artifacts", "Lexers", "SnoopPrecompile", "VT100"]
 path = "VerilogAParser.jl"
 uuid = "b333aca1-b97d-47c9-9908-8e5a8c115e58"
-version = "0.3.0"
+version = "0.3.1"
 
 [[deps.VertexSafeGraphs]]
 deps = ["Graphs"]
@@ -2173,7 +2168,7 @@ version = "1.3.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.9.0+0"
+version = "5.8.0+1"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]

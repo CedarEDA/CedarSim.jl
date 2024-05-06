@@ -121,3 +121,7 @@ LoadMKL_JLL = false
 
 [targets]
 test = ["BenchmarkTools", "CMC", "Cobweb", "CSV", "PlotlyLight", "Test", "CairoMakie", "UnicodePlots", "ControlSystemsBase", "RobustAndOptimalControl", "SciMLSensitivity", "BSIM4", "GF180MCUPDK", "Sky130PDK", "ASAP7PDK", "Diffractor"]
+
+[sources]
+SciMLBase = {url = "https://github.com/CedarEDA/SciMLBase.jl", rev = "os/dae-get-du"}
+SciMLSensitivity = {url = "https://github.com/Keno/SciMLSensitivity.jl", rev = "kf/mindep"}
