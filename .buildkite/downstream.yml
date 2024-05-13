@@ -20,6 +20,12 @@ steps:
                 coverage: false
                 extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
                 package: SpectreNetlistParser
+          - staticfloat/metahook:
+              # TODO: Pkg.test doesn't instantiate, requires
+              # https://github.com/JuliaLang/Pkg.jl/pull/3883/commits/8ab562f72806af458c816dd2f319014f8e05e5cc
+              pre-command: |
+                julia -e 'using Pkg; Pkg.Registry.add(url = "ssh://git@github.com/JuliaComputing/CedarEDARegistry.git")'
+                julia --project=test --check-bounds=yes -e 'using Pkg; Pkg.instantiate()'
         agents:
           os: "linux"
           arch: "x86_64"
@@ -37,6 +43,12 @@ steps:
                 coverage: false
                 extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
                 package: VerilogAParser
+          - staticfloat/metahook:
+              # TODO: Pkg.test doesn't instantiate, requires
+              # https://github.com/JuliaLang/Pkg.jl/pull/3883/commits/8ab562f72806af458c816dd2f319014f8e05e5cc
+              pre-command: |
+                julia -e 'using Pkg; Pkg.Registry.add(url = "ssh://git@github.com/JuliaComputing/CedarEDARegistry.git")'
+                julia --project=test --check-bounds=yes -e 'using Pkg; Pkg.instantiate()'
         agents:
           os: "linux"
           arch: "x86_64"

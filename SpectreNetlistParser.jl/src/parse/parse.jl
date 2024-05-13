@@ -698,7 +698,7 @@ function error!(ps, kind, expected=nothing)
     throw(SpectreParserError(ps, kind, expected))
 end
 
-struct SpectreParserError
+struct SpectreParserError <: Exception
     ps
     kind
     expected

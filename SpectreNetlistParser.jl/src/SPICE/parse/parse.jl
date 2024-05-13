@@ -1080,7 +1080,7 @@ function error!(ps, kind, expected=nothing)
     throw(SPICEParserError(ps, kind, expected))
 end
 
-struct SPICEParserError
+struct SPICEParserError <: Exception
     ps
     kind
     expected

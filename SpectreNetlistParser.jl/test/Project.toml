@@ -4,6 +4,7 @@ DeepDiffs = "ab62b9b5-e342-54a8-a765-a90f495de1a6"
 GF180MCUPDK = "4c528db8-839e-4d0b-8de9-a61e03c09612"
 Lexers = "8fc43420-9e17-4e89-a998-f4e9593a1dfc"
 Sky130PDK = "3a9dc963-4db1-4336-a55a-41e26ba2a676"
+SpectreNetlistParser = "72c5b8b4-6eac-4a9c-9647-0f5a982ce801"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]

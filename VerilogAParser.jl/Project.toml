@@ -4,7 +4,7 @@ authors = ["JuliaHub, Inc. and other contributors"]
 version = "0.3.1"
 
 [workspace]
-projects = ["docs"]
+projects = ["docs", "test"]
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"

@@ -4,7 +4,7 @@ version = "0.11.3"
 authors = ["JuliaHub, Inc. and other contributors"]
 
 [workspace]
-projects = ["docs", "SpectreNetlistParser.jl", "VerilogAParser.jl"]
+projects = ["docs", "test", "SpectreNetlistParser.jl", "VerilogAParser.jl"]
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -64,25 +64,18 @@ CedarSimPlotlyLightExt = "PlotlyLight"
 CedarSimReviseExt = "Revise"
 
 [compat]
-ASAP7PDK = "≥ 0.2.1"
 AbstractAlgebra = "≥ 0.31.1"
 AbstractTrees = "≥ 0.4.1"
-BSIM4 = "≥ 0.4.0"
-BenchmarkTools = "1.4.0"
-CMC = "≥ 0.2.0"
 CSV = "≥ 0.10.14"
 CassetteOverlay = "≥ 0.1.8"
 ChainRulesCore = "1.18.0"
 Combinatorics = "1.0.2"
 Compat = "4.12.0"
-ControlSystemsBase = "1.10.2"
 DAECompiler = "1.19.2"
 DecFP = "1.3.2"
-Diffractor = "≥ 0.2.8"
 DynamicScope = "≥ 0.1.2"
 ExprTools = "≥ 0.1.10"
 ForwardDiff = "≥ 0.10.36"
-GF180MCUPDK = "≥ 0.3.0"
 LinearSolve = "2.23.0"
 NonlinearSolve = "3.5.3"
 OrdinaryDiffEq = "6.70.1"
@@ -90,7 +83,6 @@ PlotlyLight = "0.6.4"
 SciMLBase = "2.36.1"
 SciMLNLSolve = "≥ 0.1.4"
 SciMLSensitivity = "7.56.2"
-Sky130PDK = "≥ 0.3.1"
 SpectreNetlistParser = "≥ 0.6.1"
 Sundials = "4.20.1"
 SymbolicIndexingInterface = "≥ 0.3.15"
@@ -98,29 +90,8 @@ VT100 = "≥ 0.3.4"
 VectorPrisms = "≥ 1.1.1"
 VerilogAParser = "≥ 0.2.1"
 
-[extras]
-ASAP7PDK = "5f726cbb-fb92-4cd0-9fae-dbb64c46e42b"
-BSIM4 = "fa7570ea-a14f-11ec-018e-d96f3217f940"
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
-CMC = "db13d295-e716-48aa-bdca-f6cce3d4ecc6"
-CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-Cobweb = "ec354790-cf28-43e8-bb59-b484409b7bad"
-ControlSystemsBase = "aaaaaaaa-a6ca-5380-bf3e-84a91bcd477e"
-Diffractor = "9f5e2b26-1114-432f-b630-d3fe2085c51c"
-GF180MCUPDK = "4c528db8-839e-4d0b-8de9-a61e03c09612"
-PlotlyLight = "ca7969ec-10b3-423e-8d99-40f33abb42bf"
-RobustAndOptimalControl = "21fd56a4-db03-40ee-82ee-a87907bee541"
-SciMLSensitivity = "1ed8b502-d754-442c-8d5d-10ac956f44a1"
-Sky130PDK = "3a9dc963-4db1-4336-a55a-41e26ba2a676"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
-
 [preferences.LinearSolve]
 LoadMKL_JLL = false
-
-[targets]
-test = ["BenchmarkTools", "CMC", "Cobweb", "CSV", "PlotlyLight", "Test", "CairoMakie", "UnicodePlots", "ControlSystemsBase", "RobustAndOptimalControl", "SciMLSensitivity", "BSIM4", "GF180MCUPDK", "Sky130PDK", "ASAP7PDK", "Diffractor"]
 
 [sources]
 SciMLBase = {url = "https://github.com/CedarEDA/SciMLBase.jl", rev = "os/dae-get-du"}

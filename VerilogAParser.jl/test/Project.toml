@@ -1,0 +1,6 @@
+[deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
+CMC = "db13d295-e716-48aa-bdca-f6cce3d4ecc6"
+Lexers = "8fc43420-9e17-4e89-a998-f4e9593a1dfc"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+VerilogAParser = "b333aca1-b97d-47c9-9908-8e5a8c115e58"

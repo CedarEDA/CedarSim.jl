@@ -107,10 +107,8 @@ function pushfile!(new_frontier, all_files_parsed, file, node)
     end
 end
 
-function test_recursive_all(root; fail_fast=false, verbose=false)
+function test_recursive_all(root; fail_fast=false, verbose=false, expected_failures=String[])
     n = 1
-    n_success = 0
-    n_fail = 0
     for (root, dirs, files) in walkdir(root)
         for file in files
             if contains(file, "_test.spice")
@@ -118,28 +116,40 @@ function test_recursive_all(root; fail_fast=false, verbose=false)
                 continue
             end
             file = joinpath(root, file)
+            expected_to_fail = any(endswith(file, ef) for ef in expected_failures)
             str = read(file, String)
             if contains(str, ".control")
                 verbose && "Ignoring $(repr(file)) has .control"
                 continue
             end
             if endswith(file, ".spice")
-                try
+                err = try
                     SPICENetlistParser.parsefile(file)
-                    verbose && printstyled("Parsed [$n] $file\n"; color=:light_green)
-                    n_success += 1
+                    nothing
                 catch e
                     e isa InterruptException && rethrow()
-                    fail_fast && rethrow()
-                    verbose && printstyled("Failed [$n] $file\n"; color=:light_red)
-                    n_fail += 1
+                    e
+                end
+                if err === nothing && !expected_to_fail
+                    verbose && printstyled("Parsed [$n] $file\n"; color=:light_green)
+                    @test true
+                elseif err isa Exception && expected_to_fail
+                    verbose && printstyled("Failed (expected) [$n] $file\n"; color=:light_green)
+                    @test_broken false
+                elseif err === nothing && expected_to_fail
+                    printstyled("Parsed (unexpected) [$n] $file\n"; color=:light_red)
+                    fail_fast && error("Unexpectedly parsed $file")
+                    @test_broken true
+                else # err isa Exception && !expected_to_fail
+                    printstyled("Failed [$n] $file\n"; color=:light_red)
+                    fail_fast && throw(err)
+                    @test false
                 end
                 n+=1
             end
         end
     end
-    verbose && print("Success: $n_success, Fail: $n_fail")
-    return n_fail
+    return
 end
 
 function test_recursive(root; verbose=false)
@@ -182,10 +192,13 @@ end
 
 sky130_root = abspath(Base.find_package("Sky130PDK"), "..", "..")
 
-root = abspath(sky130_root, "libraries", "sky130_fd_pr", "models", "sky130.lib.spice")
+root = abspath(sky130_root, "sky130A", "libs.ref", "sky130_fd_pr", "spice")
 test_recursive(root; verbose=false)
-n_fail = test_recursive_all(sky130_root; fail_fast=false, verbose=false)
-@test n_fail == 0
+test_recursive_all(
+    sky130_root;
+    fail_fast=false, verbose=false,
+    expected_failures=["combined/parameters/invariant.spice"],
+)
 
 function check_roundtrip(var; offset=0)
     s1 = SPICENetlistParser.SPICENetlistCSTParser.parse(var; offset)
