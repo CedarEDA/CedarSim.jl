@@ -1,6 +1,6 @@
 name = "CedarSim"
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
-version = "0.11.3"
+version = "0.11.4"
 authors = ["JuliaHub, Inc. and other contributors"]
 
 [workspace]
@@ -30,7 +30,6 @@ Lexers = "8fc43420-9e17-4e89-a998-f4e9593a1dfc"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
-ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
 NaNMath = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
@@ -54,12 +53,18 @@ VerilogAParser = "b333aca1-b97d-47c9-9908-8e5a8c115e58"
 [weakdeps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 PlotlyLight = "ca7969ec-10b3-423e-8d99-40f33abb42bf"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+
+[sources]
+SciMLBase = {rev = "os/dae-get-du", url = "https://github.com/CedarEDA/SciMLBase.jl"}
+SciMLSensitivity = {rev = "kf/mindep", url = "https://github.com/Keno/SciMLSensitivity.jl"}
 
 [extensions]
 CedarSimCSVExt = "CSV"
 CedarSimMakieExt = "Makie"
+CedarSimModelingToolkitExt = "ModelingToolkit"
 CedarSimPlotlyLightExt = "PlotlyLight"
 CedarSimReviseExt = "Revise"
 
@@ -71,7 +76,7 @@ CassetteOverlay = "≥ 0.1.8"
 ChainRulesCore = "1.18.0"
 Combinatorics = "1.0.2"
 Compat = "4.12.0"
-DAECompiler = "1.19.2"
+DAECompiler = "1.20"
 DecFP = "1.3.2"
 DynamicScope = "≥ 0.1.2"
 ExprTools = "≥ 0.1.10"
@@ -92,7 +97,3 @@ VerilogAParser = "≥ 0.2.1"
 
 [preferences.LinearSolve]
 LoadMKL_JLL = false
-
-[sources]
-SciMLBase = {url = "https://github.com/CedarEDA/SciMLBase.jl", rev = "os/dae-get-du"}
-SciMLSensitivity = {url = "https://github.com/Keno/SciMLSensitivity.jl", rev = "kf/mindep"}

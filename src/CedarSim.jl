@@ -10,6 +10,7 @@ export DAEProblem
 export @dyn, @requires, @provides, @isckt_or
 export solve
 
+
 include("util.jl")
 include("vasim.jl")
 include("simulate_ir.jl")
@@ -76,5 +77,61 @@ using PrecompileTools
         code3 = CedarSim.make_spectre_circuit(sa3)
     end
 end
+
+"
+    @declare_MSLConnector(mtk_model, pin_ports...)
+
+!!! note \"for this to function ModelingToolkit must be loaded\"
+    CedarSim itself only provides a stub-defination of this type.
+    The full implementation is in the CedarSim-ModelingToolkit extension module.
+    Which is automatically loaded if CedarSim and ModelingToolkit are both loaded.
+
+Defined the functions needed to connect a MTK based model (defined using MSL `Pin`s) to Cedar.
+As input provide the model (an `ODESystem`), and a list of pins defined using `ModelingToolkitStandardLibary.Electrical.Pin`s.
+These pins can be as direct components of the model or subcomponents other components.
+When you use this component as a subcircuit (as shown in the example) they be connected to CedarSim `AbstractNets` 
+corresponding to the SPICE nodes, in the order you list them.
+
+
+Note that the model does not have to be (and usually won't be) solvable in MTK -- it can be incomplete and unablanced.
+The remaining variables coming from the rest of the circuit, e.g. as defined using SPICE.
+The usual way to develop this would be to initially write the model in MTK using MSL,
+then delete all the voltage/current sources and declare that the places they were connected are port pins usng this macro.
+
+
+
+This is a higher level version of the `DAECompiler.@declare_MTKConnector`
+and does, in the end, return a subtype of `MTKConnector`.
+
+This means it is struct with a constructor that you can override the parameters to by keyword argument.
+You can check what parameters are available by using `parameternames` on an instance of the type.
+The struct will have call overriden (i.e. it will be a functor) to allow the connections CedarSim exposes to all be hooked up.
+
+It is used for example as:
+```julia
+@mtkmodel Foo begin
+    @parameters begin
+        param=0.0
+        ...
+    end
+    @components begin
+        Pos = Pin()
+        Neg = Pin()
+        ...
+    end
+    ...
+end
+
+foo = foo(name=:foo1)
+const FooConn = @declare_MSLConnector(foo, foo.Pos, foo.Neg)
+circuit = sp\"\"\" ...
+Xfoo 1 0 \$(FooConn(param = 42.0))
+...
+\"\"\"e
+"
+macro declare_MSLConnector(args...)
+    error("ModelingToolkit must be loaded for this macro to be used")
+end
+export @declare_MSLConnector
 
 end # module
