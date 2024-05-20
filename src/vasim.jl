@@ -834,7 +834,7 @@ function make_spice_device(vm::VANode{VerilogModule})
     end
 
     argnames = map(p->Symbol("#port_", p), ps)
-    external_eqs = map(zip(argnames, map(current_sum, ps))) do (a, c)
+    external_eqs = map(argnames, map(current_sum, ps)) do a, c
         :($(kcl!)($(a), $c))
     end
 
@@ -842,7 +842,7 @@ function make_spice_device(vm::VANode{VerilogModule})
     obs_expr = (:($(DAECompiler.observed!)($var,
             $DScope(dscope, $(QuoteNode(name))))) for (var, name) in observables)
 
-    arg_assign = map(zip(ps, argnames)) do (p, a)
+    arg_assign = map(ps, argnames) do p, a
         :($p = $a.V)
     end
 
