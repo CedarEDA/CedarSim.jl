@@ -12,7 +12,7 @@ include("common.jl")
     end
     # Trying to directly run `ERRcircuit()` throws an error
     # due to the `error()` in the implementation of `UnimplementedDevice()`
-    @test_throws ErrorException ERRcircuit()
+    @test_throws CedarSim.CedarError ERRcircuit()
 
     # DAECompiler sees the `error()` and complains that it is unsupported IR:
     @test_throws CedarSim.DAECompiler.UnsupportedIRException CircuitIRODESystem(ERRcircuit)

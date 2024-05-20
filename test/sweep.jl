@@ -56,13 +56,13 @@ using CedarSim: nest_param_list, flatten_param_list
     @test flatten_param_list(nest_param_list(param_list_tuple)) == param_list_tuple
 
     # Trying to assign a prefix of another value is an error
-    @test_throws ArgumentError CedarSim.nest_param_list((
+    @test_throws CedarSim.WrappedCedarException{<:ArgumentError} CedarSim.nest_param_list((
         (Symbol("x1"), 1),
         (Symbol("x1.R1"), 2),
     ))
 
     # Double-assigning a value is an error:
-    @test_throws ArgumentError CedarSim.nest_param_list((
+    @test_throws CedarSim.WrappedCedarException{<:ArgumentError} CedarSim.nest_param_list((
         (Symbol("x1"), 1),
         (Symbol("x1"), 2),
     ))

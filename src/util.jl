@@ -1,5 +1,25 @@
 using DAECompiler.Intrinsics: ddt
 
+abstract type CedarException <: Exception end
+# Always supress stack-trace on CedarExceptions as they will shouw details of out internals that are
+# confounding to end users. (Instead such exceptions must be self contained enough to be interpretted without stacktrack)
+Base.showerror(io::IO, ex::CedarException, bt; backtrace=true) = showerror(io, ex)
+
+struct WrappedCedarException{T<:Exception} <: CedarException
+    err::T
+end
+
+Base.showerror(io::IO, err::WrappedCedarException) = showerror(io, err.err)
+
+struct CedarError <: CedarException
+    msg::String
+end
+
+Base.showerror(io::IO, err::CedarError) = println(io, err.msg)
+
+cedarthrow(err) = throw(WrappedCedarException(err))
+cedarerror(msg) = throw(CedarError(msg))
+
 struct Default{T}
     val::T
 end

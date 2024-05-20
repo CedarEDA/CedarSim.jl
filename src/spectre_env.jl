@@ -3,7 +3,7 @@ using ChainRulesCore, StaticArrays
 # This gets imported by all generated Spectre code. The function names
 # exported here should correspond to what is made available by Spectre
 
-struct PWLConstructError
+struct PWLConstructError <: CedarException
     ts
     ys
 end
@@ -135,7 +135,7 @@ function bsource(;kwargs...)
     elseif Base.in(:c, keys)
         return capacitor(c=kwargs[:c])
     else
-        error("BSOURCE with args $kwargs not supported.")
+        cedarerror("BSOURCE with args $kwargs not supported.")
     end
 end
 

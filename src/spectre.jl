@@ -144,7 +144,7 @@ Base.getproperty(lens::IdentityLens, ::Symbol; type=:unknown) = lens
 struct ValLens{T} <: AbstractParamLens
     val::T
 end
-Base.getproperty(lens::ValLens, ::Symbol; type=:unknown) = error("Reached terminal lens")
+Base.getproperty(lens::ValLens, ::Symbol; type=:unknown) = cedarerror("Reached terminal lens")
 (lens::ValLens)(val) = getfield(lens, :val)
 
 """
@@ -335,7 +335,7 @@ function toposort(data::Dict{T,Set{T}}) where T
         append!(rst, ordered)
         data = Dict{T,Set{T}}(item => setdiff(dep, ordered) for (item, dep) in data if item ∉ ordered)
     end
-    isempty(data) || error("a cyclic dependency exists amongst $(data)")
+    isempty(data) || cedarerror("a cyclic dependency exists amongst $(data)")
     # items that depend on external items or on themselves
     # (meaning, on the same item in the parent scope)
     extraitems = union(selfdeps, extdeps)
@@ -1150,7 +1150,7 @@ function (pm::ParsedModel)(;kwargs...)
     setproperties(pm.model, values(kwargs))
 end
 
-struct NoBinExpection
+struct NoBinExpection <: CedarException
     bm::BinnedModel
     l::Float64
     w::Float64
@@ -1306,7 +1306,7 @@ function resolve_includepath(path, includepaths, pdkincludepaths=[])
         fullpath = joinpath(base, path)
         isfile(fullpath) && return true, fullpath
     end
-    error("include path $path not found in $includepaths or $pdkincludepaths")
+    cedarerror("include path $path not found in $includepaths or $pdkincludepaths")
 end
 
 function source_section(section::String, n::SNode{SpectreNetlistSource},
@@ -1354,7 +1354,7 @@ function source_body(n::SNode{<:SC.AbstractBlockASTNode},
             ispdk, path = resolve_includepath(str, to_julia.includepaths, to_julia.pdkincludepaths)
             va = get!(() -> VerilogAParser.parsefile(path), to_julia.parsed_files, path)
             if va.ps.errored
-                throw(LoadError(path, 0, VAParseError(va)))
+                cedarthrow(LoadError(path, 0, VAParseError(va)))
             else
                 vamod = va.stmts[end]
                 name = Symbol(String(vamod.id))
@@ -1416,7 +1416,7 @@ function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kw
             ispdk, path = resolve_includepath(str, to_julia.includepaths, to_julia.pdkincludepaths)
             va = get!(() -> VerilogAParser.parsefile(path), to_julia.parsed_files, path)
             if va.ps.errored
-                throw(LoadError(path, 0, VAParseError(va)))
+                cedarthrow(LoadError(path, 0, VAParseError(va)))
             else
                 vamod = va.stmts[end]
                 name = Symbol(String(vamod.id))
@@ -1457,7 +1457,7 @@ function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kw
                 push!(to_julia.libraries, (path, section))
                 sa = extract_section_from_lib(p; section)
                 if sa === nothing
-                    error("Unable to find section named '$(section)'; malformed SPICE?")
+                    cedarerror("Unable to find section named '$(section)'; malformed SPICE?")
                 end
                 inc_to_julia = setproperties(to_julia,
                     includepaths=[dirname(path), to_julia.includepaths...],
@@ -1566,7 +1566,7 @@ function make_spectre_netlist(n::SNode{<:Union{SC.AbstractBlockASTNode, SP.Abstr
     binned_models = make_binned_models_expr(global_to_julia, bins)
     ckts = sort_ckts(ckts)
     if !isempty(global_to_julia.params)
-        throw(ArgumentError("Circuit parameters outside circuit scope: $(keys(global_to_julia.params))"))
+        cedarthrow(ArgumentError("Circuit parameters outside circuit scope: $(keys(global_to_julia.params))"))
     end
     params = sorted_sparams(global_to_julia, toplevel)
     if !isempty(global_to_julia.parsed_files)
@@ -1710,7 +1710,7 @@ macro spc_str(str, flag="")
     inline = 'i' in flag
     sa = SpectreNetlistParser.parse(IOBuffer(str); enable_julia_escape)
     if sa.ps.errored
-        throw(LoadError("sa_str", 0, ""))
+        cedarthrow(LoadError("sa_str", 0, ""))
     else
         # eval required to sequence macro definitions
         ast = CedarSim.make_spectre_netlist(sa, include_paths, [], !inline)
@@ -1725,7 +1725,7 @@ macro sp_str(str, flag="")
     sa = SpectreNetlistParser.parse(IOBuffer(str); start_lang=:spice, enable_julia_escape,
         implicit_title = !inline)
     if sa.ps.errored
-        throw(LoadError("sa_str", 0, ""))
+        cedarthrow(LoadError("sa_str", 0, ""))
     elseif !inline
         return esc(CedarSim.make_spectre_circuit(sa, include_paths, []))
     else

@@ -34,7 +34,7 @@ struct Net{T} <: AbstractNet
         kcl! = equation(name)
         dVdt = ddt(V)
         if multiplier < 0.0
-            throw(ArgumentError("Cannot construct an Net with non-positive multiplier '$(multiplier)'"))
+            throw(ArgumentError("Cannot construct a Net with non-positive multiplier '$(multiplier)'"))
         end
         obj = new{typeof(dVdt)}(V, kcl!, multiplier)
         return obj
@@ -43,7 +43,7 @@ struct Net{T} <: AbstractNet
     function Net(net::Net{T}, multiplier::Float64) where {T}
         multiplier = net.multiplier * multiplier
         if multiplier < 0.0
-            throw(ArgumentError("Cannot construct an Net with non-positive multiplier '$(multiplier)'"))
+            throw(ArgumentError("Cannot construct a Net with non-positive multiplier '$(multiplier)'"))
         end
         return new{T}(net.V, net.kcl!, multiplier)
     end
@@ -59,7 +59,7 @@ struct ParallelInstances
 
     function ParallelInstances(device, multiplier::Float64)
         if multiplier < 0.0
-            throw(ArgumentError("Cannot construct a ParallelInstances with non-positive multiplier '$(multiplier)'"))
+            cedarthrow(ArgumentError("Cannot construct a ParallelInstances with non-positive multiplier '$(multiplier)'"))
         end
         return new(device, multiplier)
     end

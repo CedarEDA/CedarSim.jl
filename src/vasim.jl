@@ -266,7 +266,7 @@ function (to_julia::Scope)(asb::VANode{AnalogSeqBlock})
     ret
 end
 
-abstract type SemaError; end
+abstract type SemaError <: CedarException; end
 
 struct DuplicateDef <: SemaError
     name::Symbol
@@ -459,7 +459,7 @@ end
 function (to_julia::Scope)(stmt::VANode{AnalogVariableAssignment})
     assignee = Symbol(stmt.lvalue)
     varT = get(to_julia.var_types, assignee, nothing)
-    assignee === nothing && error("Undeclared variable: $assignee")
+    assignee === nothing && cedarerror("Undeclared variable: $assignee")
 
     eq = stmt.eq.op
 
@@ -477,7 +477,7 @@ function (to_julia::Scope)(stmt::VANode{AnalogVariableAssignment})
          eq == VAT.RBITSHIFT_EQ   ? :(>>=) :
          eq == VAT.LBITSHIFT_A_EQ ? :(=) : # Extra handling below
          eq == VAT.RBITSHIFT_A_EQ ? :(>>>=) :
-         error("Unsupported assignment operator: $eq")
+         cedarerror("Unsupported assignment operator: $eq")
 
     req = Expr(op, assignee, varT === nothing ? Expr(:call, error, "Unknown type for variable $assignee") :
         Expr(:call, VerilogAEnvironment.vaconvert, varT, to_julia(stmt.rvalue)))
@@ -537,7 +537,7 @@ function (to_julia::Scope)(fd::VANode{AnalogFunctionDeclaration})
                     var_types[Symbol(name.item)] = T
                 end
             end
-            _ => error("Unknown function declaration item")
+            _ => cedarerror("Unknown function declaration item")
         end
     end
 
@@ -593,7 +593,7 @@ function (to_julia::Scope)(stmt::VANode{AnalogSystemTaskEnable})
             warn = GlobalRef(Base, Symbol("@warn"))
             return nothing # Expr(:macrocall, warn, LineNumberNode(stmt), args..., :(maxlog=1))
         else
-            error("Verilog task unimplmented: $fname")
+            cedarerror("Verilog task unimplmented: $fname")
         end
     else
         error()
@@ -779,7 +779,7 @@ function make_spice_device(vm::VANode{VerilogModule})
                 lno = LineNumberNode(item.stmt)
                 push!(ret.args, to_julia(item.stmt))
             end
-            _ => error("Unrecognized statement $child")
+            _ => cedarerror("Unrecognized statement $child")
         end
     end
 
@@ -900,7 +900,7 @@ end
 function parse_and_eval_vafile(mod::Module, file::VAFile)
     va = VerilogAParser.parsefile(file.file)
     if va.ps.errored
-        throw(LoadError(file.file, 0, VAParseError(va)))
+        cedarthrow(LoadError(file.file, 0, VAParseError(va)))
     else
         Core.eval(mod, make_module(va))
     end
@@ -915,7 +915,7 @@ end
 macro va_str(str)
     va = VerilogAParser.parse(IOBuffer(str))
     if va.ps.errored
-        throw(LoadError("va_str", 0, VAParseError(va)))
+        cedarthrow(LoadError("va_str", 0, VAParseError(va)))
     else
         esc(make_module(va))
     end

@@ -116,7 +116,7 @@ end
             push!(keys_by_prefix[prefix], (Symbol(kstr), tail, v))
         else
             if haskey(without_prefix, Symbol(kstr))
-                throw(ArgumentError("Cannot double-assign a key: $(kstr)"))
+                cedarthrow(ArgumentError("Cannot double-assign a key: $(kstr)"))
             end
             without_prefix[Symbol(kstr)] = v
         end
@@ -124,7 +124,7 @@ end
 
     clobbered_prefixes = intersect(keys(keys_by_prefix), keys(without_prefix))
     if !isempty(clobbered_prefixes)
-        throw(ArgumentError("Cannot assign to a prefix of another key: $(clobbered_prefixes)"))
+        cedarthrow(ArgumentError("Cannot assign to a prefix of another key: $(clobbered_prefixes)"))
     end
 
     # Recursively collapse each `keys_by_prefix` mapping into a Dict

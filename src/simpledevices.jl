@@ -381,7 +381,7 @@ end
 end
 
 function (S::Switch)(A, B, CA, CB; dscope=defaultscope(S))
-    error("Switch device is currently Unimplemented")
+    cedarerror("Switch device is currently Unimplemented")
 end
 
 #=
@@ -413,5 +413,5 @@ end
 UnimplementedDevice(;kwargs...) = UnimplementedDevice(kwargs)
 
 function (::UnimplementedDevice)(args...; dscope=nothing)
-    error("Unimplemented device")
+    cedarerror("Unimplemented device")
 end

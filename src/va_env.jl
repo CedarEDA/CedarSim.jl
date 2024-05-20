@@ -35,7 +35,7 @@ export pow, ln, ddt, flicker_noise, white_noise, atan2, log
 @noinline Base.@assume_effects :total pow(a, b) = NaNMath.pow(a, b)
 @noinline Base.@assume_effects :total pow(a::ForwardDiff.Dual, b) = NaNMath.pow(a, b)
 @noinline Base.@assume_effects :total ln(x) = NaNMath.log(x)
-log(x) = error("log not supported, use $log10 or $ln instead")
+log(x) = cedarerror("log not supported, use $log10 or $ln instead")
 !(a) = Base.:!(a)
 !(a::Int64) = a == zero(a)
 atan2(x,y) = Base.atan(x,y)
