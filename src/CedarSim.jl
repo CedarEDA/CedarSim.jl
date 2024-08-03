@@ -81,7 +81,7 @@ end
 "
     @declare_MSLConnector(mtk_model, pin_ports...)
 
-!!! note \"for this to function ModelingToolkit must be loaded\"
+!!! note \"For this to be used ModelingToolkit must be loaded\"
     CedarSim itself only provides a stub-defination of this type.
     The full implementation is in the CedarSim-ModelingToolkit extension module.
     Which is automatically loaded if CedarSim and ModelingToolkit are both loaded.
@@ -128,6 +128,7 @@ circuit = sp\"\"\" ...
 Xfoo 1 0 \$(FooConn(param = 42.0))
 ...
 \"\"\"e
+```
 "
 macro declare_MSLConnector(args...)
     error("ModelingToolkit must be loaded for this macro to be used")

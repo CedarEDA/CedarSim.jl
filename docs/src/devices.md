@@ -199,3 +199,12 @@ kcl!(net::AbstractNet, current) = net.kcl!(current)
 Here we are simply making use of the capability of DAECompiler to split the contributions
 to an equation across multiple invocations to that equation (in particular, this use case
 was motivating for that feature).
+
+# Using ModelingToolkit
+You can implement also devices using [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl) and the [ModelingToolkitStandardLibary.jl](https://docs.sciml.ai/ModelingToolkitStandardLibrary/stable/), and then connect them to CedarSim circuits.
+For many users this will be the best way to implement custom devices, as you can fully use the MTK ecosystem to develop and debug them in isolation then hook them up to a greater circuit in Cedar.
+
+```@docs; canonical=false
+@declare_MSLConnector
+```
+
