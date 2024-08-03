@@ -42,6 +42,7 @@ SciMLNLSolve = "e9a6253c-8580-4d32-9898-8661bb511710"
 SciMLSensitivity = "1ed8b502-d754-442c-8d5d-10ac956f44a1"
 Scratch = "6c6a2e73-6563-6170-7368-637461726353"
 SpectreNetlistParser = "72c5b8b4-6eac-4a9c-9647-0f5a982ce801"
+StateSelection = "64909d44-ed92-46a8-bbd9-f047dfbdc84b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
@@ -58,8 +59,8 @@ PlotlyLight = "ca7969ec-10b3-423e-8d99-40f33abb42bf"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 
 [sources]
-SciMLBase = {rev = "os/dae-get-du", url = "https://github.com/CedarEDA/SciMLBase.jl"}
-SciMLSensitivity = {rev = "kf/mindep", url = "https://github.com/Keno/SciMLSensitivity.jl"}
+SciMLBase = {rev = "os/dae-get-du2", url = "https://github.com/CedarEDA/SciMLBase.jl"}
+SciMLSensitivity = {rev = "kf/mindep2", url = "https://github.com/CedarEDA/SciMLSensitivity.jl"}
 
 [extensions]
 CedarSimCSVExt = "CSV"
@@ -85,15 +86,15 @@ LinearSolve = "2.23.0"
 NonlinearSolve = "3.5.3"
 OrdinaryDiffEq = "6.70.1"
 PlotlyLight = "0.6.4"
-SciMLBase = "2.36.1"
 SciMLNLSolve = "≥ 0.1.4"
-SciMLSensitivity = "7.56.2"
 SpectreNetlistParser = "≥ 0.6.1"
 Sundials = "4.20.1"
 SymbolicIndexingInterface = "≥ 0.3.15"
 VT100 = "≥ 0.3.4"
 VectorPrisms = "≥ 1.1.1"
 VerilogAParser = "≥ 0.2.1"
+# https://github.com/andreasvarga/DescriptorSystems.jl/commit/cb6fd45de5a8cbe5f9aa9d52daeccac90c7dfb50#r144920205
+DescriptorSystems = "< 1.4.2"
 
 [preferences.LinearSolve]
 LoadMKL_JLL = false

@@ -18,7 +18,7 @@ steps:
               # TODO: Pkg.test doesn't instantiate, requires
               # https://github.com/JuliaLang/Pkg.jl/pull/3883/commits/8ab562f72806af458c816dd2f319014f8e05e5cc
               pre-command: |
-                julia -e 'using Pkg; Pkg.Registry.add(url = "ssh://git@github.com/JuliaComputing/CedarEDARegistry.git")'
+                julia -e 'using Pkg; Pkg.Registry.add(url = "ssh://git@github.com/CedarEDA/PublicRegistry.git")'
                 julia --project=test --check-bounds=yes -e 'using Pkg; Pkg.instantiate()'
               # Compress all of our `.ir` files into a single tarball:
               pre-artifact: |
@@ -27,7 +27,7 @@ steps:
               use_ssh: true
               coverage: false
               allow_reresolve: false
-              extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+              extra_registries: ssh://git@github.com/CedarEDA/PublicRegistry.git
         agents:
           os: "linux"
           arch: "x86_64"
@@ -53,7 +53,7 @@ steps:
           - JuliaCI/julia-test#v1:
                 use_ssh: true
                 run_tests: false
-                extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+                extra_registries: ssh://git@github.com/CedarEDA/PublicRegistry.git
         commands: |
           echo "--- Prepare dependencies"
           apt update && apt install -y make
@@ -87,7 +87,7 @@ steps:
       - JuliaCI/julia-test#v1:
           use_ssh: true
           coverage: false
-          extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+          extra_registries: ssh://git@github.com/CedarEDA/PublicRegistry.git
       - staticfloat/metahook:
           # Compress all of our `.ir` files into a single tarball:
           pre-artifact: |

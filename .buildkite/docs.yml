@@ -17,7 +17,7 @@ steps:
           - JuliaCI/julia-test#v1:
               use_ssh: true
               run_tests: false
-              extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+              extra_registries: ssh://git@github.com/CedarEDA/PublicRegistry.git
         commands: |
           export DOCUMENTER_KEY=$${GITHUB_SSH_KEY}
           echo "+++ Building docs..."
@@ -47,7 +47,7 @@ steps:
           - JuliaCI/julia-test#v1:
               use_ssh: true
               run_tests: false
-              extra_registries: ssh://git@github.com/JuliaComputing/CedarEDARegistry.git
+              extra_registries: ssh://git@github.com/CedarEDA/PublicRegistry.git
         commands: |
           export DOCUMENTER_KEY=$${GITHUB_SSH_KEY}
           echo "+++ Building docs..."

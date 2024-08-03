@@ -6,7 +6,7 @@
 
 julia -e 'import Pkg; \
           Pkg.setprotocol!(protocol="ssh"); \
-          Pkg.Registry.add([Pkg.Registry.RegistrySpec(url="ssh://git@github.com/JuliaComputing/CedarEDARegistry.git")]); \
+          Pkg.Registry.add([Pkg.Registry.RegistrySpec(url="ssh://git@github.com/CedarEDA/PublicRegistry.git")]); \
           Pkg.Registry.add([Pkg.Registry.RegistrySpec(url="ssh://git@github.com/JuliaComputing/JuliaSimRegistry.git")]); \
           '
 

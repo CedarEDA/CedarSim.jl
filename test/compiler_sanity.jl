@@ -13,8 +13,8 @@ let f = CedarSim.find_bin, args = Tuple{
 
     # Check the same with the DAEInterpreter, which should be the same, but let's
     # verify
-    let (interp, frame) = DAECompiler.typeinf_dae(Tuple{typeof(f), args.parameters...})
-        @test Core.Compiler.is_foldable(frame.ipo_effects)
+    let (interp, ci) = DAECompiler.typeinf_dae(Tuple{typeof(f), args.parameters...})
+        @test Core.Compiler.is_foldable(Core.Compiler.decode_effects(ci.ipo_purity_bits))
     end
 end
 
