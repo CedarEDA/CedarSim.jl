@@ -4,7 +4,7 @@ version = "0.11.4"
 authors = ["JuliaHub, Inc. and other contributors"]
 
 [workspace]
-projects = ["docs", "test", "SpectreNetlistParser.jl", "VerilogAParser.jl"]
+projects = ["docs", "test", "SpectreNetlistParser.jl", "VerilogAParser.jl", "benchmarks"]
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -60,7 +60,7 @@ Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 
 [sources]
 SciMLBase = {rev = "os/dae-get-du2", url = "https://github.com/CedarEDA/SciMLBase.jl"}
-SciMLSensitivity = {rev = "kf/mindep2", url = "https://github.com/CedarEDA/SciMLSensitivity.jl"}
+SciMLSensitivity = {rev = "kf/mindep3", url = "https://github.com/CedarEDA/SciMLSensitivity.jl"}
 
 [extensions]
 CedarSimCSVExt = "CSV"
@@ -79,6 +79,7 @@ Combinatorics = "1.0.2"
 Compat = "4.12.0"
 DAECompiler = "1.20"
 DecFP = "1.3.2"
+DescriptorSystems = "< 1.4.2"
 DynamicScope = "≥ 0.1.2"
 ExprTools = "≥ 0.1.10"
 ForwardDiff = "≥ 0.10.36"
@@ -87,14 +88,13 @@ NonlinearSolve = "3.5.3"
 OrdinaryDiffEq = "6.70.1"
 PlotlyLight = "0.6.4"
 SciMLNLSolve = "≥ 0.1.4"
+SciMLSensitivity = "7.64.0"
 SpectreNetlistParser = "≥ 0.6.1"
 Sundials = "4.20.1"
 SymbolicIndexingInterface = "≥ 0.3.15"
 VT100 = "≥ 0.3.4"
 VectorPrisms = "≥ 1.1.1"
 VerilogAParser = "≥ 0.2.1"
-# https://github.com/andreasvarga/DescriptorSystems.jl/commit/cb6fd45de5a8cbe5f9aa9d52daeccac90c7dfb50#r144920205
-DescriptorSystems = "< 1.4.2"
 
 [preferences.LinearSolve]
 LoadMKL_JLL = false

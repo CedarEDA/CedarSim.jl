@@ -1,8 +1,3 @@
-# We have a `Project.toml` here that provides `BenchmarkTools` and `TimerOutputs`
-# This allows us to still load `CedarSim` by pushing its environment onto the
-# front of the loading stack, without needing to duplicate that entire project here.
-insert!(Base.LOAD_PATH, 1, dirname(dirname(@__DIR__)))
-
 println("--- gf180_dff reconstruction benchmark")
 
 include("benchmark_common.jl")
