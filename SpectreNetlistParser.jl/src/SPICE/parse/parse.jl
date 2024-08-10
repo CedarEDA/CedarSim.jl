@@ -47,6 +47,7 @@ function parse_dot(ps, dot)
         TEMP => parse_temp(ps, dot)
         WIDTH => parse_width(ps, dot)
         HDL => parse_hdl(ps, dot)
+        IF => parse_if(ps, dot)
         _ =>  error!(ps, UnexpectedToken)
     end
 end
@@ -430,7 +431,6 @@ function parse_endl(ps, dot)
     return EXPR(EndlStatement(dot, endd, endl_id, nl))
 end
 
-
 function parse_lib(ps, dot)
     kw = take_kw(ps, LIB)
     # library section is of the form .lib identifier
@@ -445,16 +445,55 @@ function parse_lib(ps, dot)
             stmt = parse_spice_toplevel(ps)
             # Failed to parse toplevel, should have an endl here
             if stmt isa EXPR{EndlStatement}
-                return EXPR(LibStatement(dot, kw, name, nl, exprs, stmt))
+                break
             end
             push!(exprs, stmt)
         end
+        return EXPR(LibStatement(dot, kw, name, nl, exprs, stmt))
     else
         path = take_path(ps)
         name = take_identifier(ps)
         nl = accept_newline(ps)
         return EXPR(LibInclude(dot, kw, path, name, nl))
     end
+end
+
+function parse_condition(ps)
+    lparen = accept(ps, LPAREN)
+    expr = parse_expression(ps)
+    rparen = accept(ps, RPAREN)
+    return EXPR(Condition(lparen, expr, rparen))
+end
+
+function parse_ifelse_block(ps, dot, kw)
+    condition = nothing
+    if kw.form.kw in (IF, ELSEIF)
+        condition = parse_condition(ps)
+    end
+    nl = accept_newline(ps)
+    stmts = EXPRList{Any}()
+    while true
+        if kind(nt(ps)) == DOT && kind(nnt(ps)) in (ELSE, ELSEIF, ENDIF)
+            break
+        end
+        stmt = parse_spice_toplevel(ps)
+        push!(stmts, stmt)
+    end
+    return EXPR(IfElseCase(dot, kw, condition, nl, stmts))
+end
+
+function parse_if(ps, dot)
+    kw = take_kw(ps, IF)
+    cases = EXPRList{IfElseCase}()
+    while true
+        push!(cases, parse_ifelse_block(ps, dot, kw))
+        dot = take(ps, DOT)
+        tok = kind(nt(ps))
+        kw = take_kw(ps, (IF, ELSE, ELSEIF, ENDIF))
+        tok === ENDIF && break
+    end
+    nl = accept_newline(ps)
+    return EXPR(IfBlock(cases, dot, kw, nl))
 end
 
 function parse_primary_or_unary(ps)

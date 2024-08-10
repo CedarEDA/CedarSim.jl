@@ -1336,12 +1336,12 @@ function source_section(section::String, n::SNode{SPICENetlistSource},
 end
 
 function source_body(n::SNode{<:SC.AbstractBlockASTNode},
-                     to_julia::SpcScope; kwargs...)
+                     to_julia::SpcScope; instances::Vector{Any}, kwargs...)
     for stmt in n.stmts
         isa(stmt, SNode{SC.Simulator}) && continue
         if isa(stmt, SNode{SC.Instance})
-            push!(kwargs[:instances], LineNumberNode(stmt))
-            push!(kwargs[:instances], to_julia(stmt))
+            push!(instances, LineNumberNode(stmt))
+            push!(instances, to_julia(stmt))
         elseif isa(stmt, SNode{SC.Parameters})
             to_julia(stmt)
         elseif isa(stmt, SNode{SC.Model})
@@ -1379,7 +1379,7 @@ function source_body(n::SNode{<:SC.AbstractBlockASTNode},
                 end
             end
         elseif isa(stmt, SNode{SPICENetlistSource})
-            source_body(stmt, to_julia; kwargs...)
+            source_body(stmt, to_julia; instances, kwargs...)
         elseif isa(stmt, SNode{SC.Subckt})
             name, ast = to_julia(stmt)
             kwargs[:ckts][name] = ast
@@ -1404,7 +1404,45 @@ function extract_section_from_lib(p; section)
     return nothing
 end
 
-function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kwargs...)
+const AnyInstance = Union{SNode{SP.MOSFET}, SNode{SP.SubcktCall},
+    SNode{SP.Capacitor}, SNode{SP.Diode}, SNode{SP.BipolarTransistor},
+    SNode{SP.Voltage}, SNode{SP.Current}, SNode{SP.Behavioral},
+    SNode{SP.CCVS}, SNode{SP.CCCS}, SNode{SP.VCVS}, SNode{SP.VCCS},
+    SNode{SP.Switch}, SNode{SP.Resistor}, SNode{SP.Inductor},
+    SNode{SP.JuliaDevice}}
+
+function cg_instance(to_julia::SpcScope, stmt::SNode)
+    if isa(stmt, AnyInstance)
+        return Expr(:block,
+            LineNumberNode(stmt),
+            to_julia(stmt))
+    elseif isa(stmt, SNode{SP.IfBlock})
+        head = :if
+        local last_expr, expr
+        for case in stmt.cases
+            if_instances = Expr(:block)
+            if case.condition === nothing
+                this_expr = if_instances
+            else
+                this_expr = Expr(head, to_julia(case.condition.body), if_instances)
+            end
+            for stmt′ in case.stmts
+                push!(if_instances.args, cg_instance(to_julia, stmt′))
+            end
+            @isdefined(last_expr) && push!(last_expr.args, this_expr)
+            if !@isdefined(expr)
+                expr = this_expr
+            end
+            last_expr = this_expr
+            head = :elseif
+        end
+        return expr
+    else
+        cedarerror("Invalid statement in instance context")
+    end
+end
+
+function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; instances::Vector{Any}, kwargs...)
     for stmt in n.stmts
         if isa(stmt, SNode{SP.ParamStatement})
             to_julia(stmt)
@@ -1440,7 +1478,7 @@ function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kw
                 inc_to_julia = setproperties(to_julia,
                     includepaths=[dirname(path), to_julia.includepaths...],
                     is_circuit=to_julia.is_circuit && !ispdk)
-                source_body(sa, inc_to_julia; kwargs...)
+                source_body(sa, inc_to_julia; instances, kwargs...)
             end
         elseif isa(stmt, SNode{SP.LibInclude})
             str = strip(unescape_string(String(stmt.path)), ['"', '\'']) # verify??
@@ -1462,7 +1500,7 @@ function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kw
                 inc_to_julia = setproperties(to_julia,
                     includepaths=[dirname(path), to_julia.includepaths...],
                     is_circuit=to_julia.is_circuit && !ispdk)
-                source_body(sa, inc_to_julia; kwargs...)
+                source_body(sa, inc_to_julia; instances, kwargs...)
             end
         elseif isa(stmt, SNode{SP.LibStatement}) ||
                isa(stmt, SNode{SP.EndStatement})
@@ -1470,24 +1508,8 @@ function source_body(n::SNode{<:SP.AbstractBlockASTNode}, to_julia::SpcScope; kw
         elseif isa(stmt, SNode{SP.Subckt})
             name, ast = to_julia(stmt)
             kwargs[:ckts][name] = ast
-        elseif isa(stmt, SNode{SP.MOSFET}) ||
-               isa(stmt, SNode{SP.SubcktCall}) ||
-               isa(stmt, SNode{SP.Capacitor}) ||
-               isa(stmt, SNode{SP.Diode}) ||
-               isa(stmt, SNode{SP.BipolarTransistor}) ||
-               isa(stmt, SNode{SP.Voltage}) ||
-               isa(stmt, SNode{SP.Current}) ||
-               isa(stmt, SNode{SP.Behavioral}) ||
-               isa(stmt, SNode{SP.CCVS}) ||
-               isa(stmt, SNode{SP.CCCS}) ||
-               isa(stmt, SNode{SP.VCVS}) ||
-               isa(stmt, SNode{SP.VCCS}) ||
-               isa(stmt, SNode{SP.Switch}) ||
-               isa(stmt, SNode{SP.Resistor}) ||
-               isa(stmt, SNode{SP.Inductor}) ||
-               isa(stmt, SNode{SP.JuliaDevice})
-            push!(kwargs[:instances], LineNumberNode(stmt))
-            push!(kwargs[:instances], to_julia(stmt))
+        elseif isa(stmt, AnyInstance) || isa(stmt, SNode{SP.IfBlock})
+            push!(instances, cg_instance(to_julia, stmt))
         elseif isa(stmt, SNode{SP.OptionStatement}) ||
                isa(stmt, SNode{SP.TempStatement})
             to_julia(stmt)
