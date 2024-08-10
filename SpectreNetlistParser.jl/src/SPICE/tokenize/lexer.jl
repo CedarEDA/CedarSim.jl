@@ -518,12 +518,12 @@ function lex_identifier(l::Lexer{IO_t,T}, c) where {IO_t,T}
     end
 
     if t !== nothing
-        while length(t.children)==1
+        while !t.is_key && length(t.children)==1
             t = first(values(t.children))
         end
         if t.is_key
             # some dot commands are implicit expressions
-            if l.last_nontriv_token == DOT && t.value in (PARAMETERS, IC, MEASURE, PRINT)
+            if l.last_nontriv_token == DOT && t.value in (PARAMETERS, IC, MEASURE, PRINT, IF, ELSEIF)
                 push!(l.lexing_expression_stack, t.value)
             end
             return emit(l, t.value)

@@ -158,6 +158,11 @@ end
         end_builtin_functions,
         =#
 
+        IF,
+        ELSE,
+        ELSEIF,
+        ENDIF,
+
         MODEL,
         LIB,
         INCLUDE,
