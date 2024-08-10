@@ -288,3 +288,15 @@ str = sprint(io -> Base.showerror(io, e))
 using GF180MCUPDK
 f = joinpath(pkgdir(GF180MCUPDK), "model", "sm141064.ngspice")
 SPICENetlistParser.SPICENetlistCSTParser.parsefile(f)
+
+# Test if/else/endif
+ifleseif = """
+* If Test
+.param x = 3
+.if (x == 2)
+.elseif (x == 3)
+.elseif (x == 4)
+.else
+.endif
+"""
+ast = SPICENetlistParser.SPICENetlistCSTParser.parse(ifleseif)

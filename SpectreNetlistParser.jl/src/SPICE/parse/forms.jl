@@ -516,13 +516,13 @@ end
 
 struct When <: AbstractASTNode
     type::EXPR{Keyword}
-    expr::EXPR
+    body::EXPR
 end
 
 struct At <: AbstractASTNode
     type::EXPR{Keyword}
     ex::EXPR{Notation}
-    expr::EXPR
+    body::EXPR
 end
 
 struct RiseFallCross <: AbstractASTNode
@@ -541,7 +541,7 @@ end
 struct FindDerivParam <: AbstractASTNode
     type::EXPR{Keyword}
     eq::Union{Nothing, EXPR{Notation}}
-    expr::EXPR
+    body::EXPR
 end
 
 
@@ -567,7 +567,7 @@ end
 
 struct AvgMaxMinPPRmsInteg <: AbstractASTNode
     kw::EXPR{Keyword}
-    expr::EXPR
+    body::EXPR
 end
 
 struct Val_ <: AbstractASTNode
@@ -613,6 +613,27 @@ struct Tran <: AbstractASTNode
     tstart::Union{Nothing, EXPR{NumericValue}}
     tmax::Union{Nothing, EXPR{NumericValue}}
     uic::Union{Nothing, EXPR{Identifier}}
+    nl::EXPR{Notation}
+end
+
+struct Condition <: AbstractASTNode
+    lparen::EXPR{Notation}
+    body::EXPR
+    rparen::EXPR{Notation}
+end
+
+struct IfElseCase <: AbstractASTNode
+    dot::EXPR{Notation}
+    kw::EXPR{Keyword}
+    condition::Union{Nothing, EXPR{Condition}}
+    nl::EXPR{Notation}
+    stmts::EXPRList
+end
+
+struct IfBlock <: AbstractASTNode
+    cases::EXPRList{IfElseCase}
+    dot::EXPR{Notation}
+    endif::EXPR{Keyword}
     nl::EXPR{Notation}
 end
 

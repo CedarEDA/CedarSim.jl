@@ -736,4 +736,19 @@ end
     @test sol[sys.r2.I][end] ≈ 1e-3
 end
 
+@testset "ifelse" begin
+    spice_code = """
+    * ifelse resistor
+    .param switch=1
+    v1 vcc 0 1
+    .if (switch == 1)
+    R1 vcc 0 1
+    .else
+    R1 vcc 0 2
+    .endif
+    """
+    sys, sol = solve_spice_code(spice_code);
+    @test sol[sys.r1.I][end] ≈ 1.
+end
+
 end # basic_tests
