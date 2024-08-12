@@ -607,7 +607,8 @@ function parse_expression(ps)
     if is_operator(kind(nt(ps)))
         op = take_operator(ps)
         ex = parse_binop(ps, ex, op)
-    elseif kind(nt(ps)) == CONDITIONAL
+    end
+    if kind(nt(ps)) == CONDITIONAL
         not = take(ps, CONDITIONAL)
         ifcase = parse_expression(ps)
         colon = accept(ps, COLON)

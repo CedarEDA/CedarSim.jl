@@ -300,3 +300,12 @@ ifleseif = """
 .endif
 """
 ast = SPICENetlistParser.SPICENetlistCSTParser.parse(ifleseif)
+
+let conditional_after_binop = """
+* Conditional after Binop
+.param x = 1
+.param y = +(x<5 ? 1e5 : 1e-5)
+"""
+    ast = SPICENetlistParser.SPICENetlistCSTParser.parse(conditional_after_binop)
+    @test ast.stmts[3].params[1].val.operand.inner.form isa SPICENetlistParser.SPICENetlistCSTParser.TernaryExpr
+end
