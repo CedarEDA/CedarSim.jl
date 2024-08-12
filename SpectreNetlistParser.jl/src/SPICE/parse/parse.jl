@@ -748,6 +748,7 @@ function parse_end(ps, dot)
 end
 
 function parse_instance(ps)
+    @show kind(nt(ps))
     @case kind(nt(ps)) begin
         IDENTIFIER_RESISTOR => parse_resistor(ps)
         IDENTIFIER_VOLTAGE => parse_voltage(ps)
@@ -758,6 +759,7 @@ function parse_instance(ps)
         IDENTIFIER_CURRENT_CONTROLLED_VOLTAGE => parse_current_controlled(CCVS, ps)
         IDENTIFIER_BEHAVIORAL => parse_behavioral(ps)
         IDENTIFIER_MOSFET => parse_mosfet(ps)
+        IDENTIFIER_VA_INSTANCE => parse_subckt_call(ps)
         IDENTIFIER_S_PARAMETER_ELEMENT => parse_s_parameter_element(ps)
         IDENTIFIER_SWITCH => parse_switch(ps)
         IDENTIFIER_DIODE => parse_diode(ps)

@@ -557,8 +557,11 @@ function (to_julia::SpcScope)(n::SNode{SC.Model})
         if name == :TYPE
             name = :DEVTYPE
             val = Symbol(p.val)
-            @assert val in (:p, :n)
-            val = val == :p ? 0 : 1
+            if val in (:p, :n)
+                val = val == :p ? 0 : 1
+            else
+                val = to_julia(val)
+            end
         elseif name == :LEVEL
             # TODO
             continue
@@ -620,10 +623,13 @@ function spice_select_device(devkind, level, version, stmt; dialect=:ngspice)
             return :(SpectreEnvironment.Switch)
         end
     end
+    return devkind
+#=
     file = stmt.ps.srcfile.path
     line = SpectreNetlistParser.LineNumbers.compute_line(stmt.ps.srcfile.lineinfo, stmt.startof)
     @warn "Device $devkind at level $level not implemented" _file=file _line=line
     return :UnimplementedDevice
+=#
 end
 
 function devtype_param(model_kind, mosfet_kind)
@@ -684,9 +690,11 @@ function (to_julia::SpcScope)(n::SNode{SP.Model}, bins::Dict{Symbol, Vector{Symb
         if name == :type
             name = :devtype
             val = LSymbol(p.val)
-            @assert val in (:p, :n)
-            mosfet_type = val == :p ? :pmos : :nmos
-            continue
+            if val in (:p, :n)
+                mosfet_type = val == :p ? :pmos : :nmos
+                continue
+            end
+            val = to_julia(p.val)
         elseif name == :level
             # TODO
             level = Int(parse(Float64, String(p.val)))

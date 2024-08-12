@@ -213,7 +213,10 @@ function (scope::Scope)(ip::VANode{SystemIdentifier})
     # without arguments in the spec.
     if id == Symbol("\$temperature")
         return Expr(:call, id)
+    elseif id == Symbol("\$mfactor")
+        return 1
     else
+        @show id
         error()
     end
 end
@@ -373,19 +376,23 @@ function (to_julia::Scope)(stmt::VANode{FunctionCall})
             return :($(Vref(id1)) - $(Vref(id2)))
         end
     elseif fname == :I
-        @assert length(stmt.args) == 2
+        @assert length(stmt.args) in (1, 2)
         id1 = Symbol(stmt.args[1].item)
-        id2 = Symbol(stmt.args[2].item)
+        id2 = length(stmt.args) > 1 ? Symbol(stmt.args[2].item) : nothing
 
-        idx = findfirst(to_julia.branch_order) do branch
-            branch == (id1 => id2) || branch == (id2 => id1)
+        if id2 == nothing
+            push!(to_julia.used_branches, id1 => Symbol("0"))
+            reversed = false
+        else
+            idx = findfirst(to_julia.branch_order) do branch
+                branch == (id1 => id2) || branch == (id2 => id1)
+            end
+            @assert idx !== nothing
+
+            branch = to_julia.branch_order[idx]
+            reversed = branch == (id2 => id1)
+            push!(to_julia.used_branches, branch)
         end
-        @assert idx !== nothing
-
-        branch = to_julia.branch_order[idx]
-        reversed = branch == (id2 => id1)
-        push!(to_julia.used_branches, branch)
-
         ex = :(error("TODO"))
         reversed && (ex = :(-$ex))
         return ex
