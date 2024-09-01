@@ -26,9 +26,8 @@ function Base.LineNumberNode(n::SNode)
     sf = n.ps.srcfile
     lsf = sf.lineinfo
     lno_first = SpectreNetlistParser.LineNumbers.compute_line(lsf, n.startof+n.expr.off)
-    LineNumberNode(lno_first, Symbol(sf.path))
+    LineNumberNode(lno_first + n.ps.line_offset, sf.path === nothing ? nothing : Symbol(sf.path))
 end
-
 
 struct SpcScope
     nets::Dict{Symbol, Expr}
@@ -601,7 +600,7 @@ function spice_select_device(devkind, level, version, stmt; dialect=:ngspice)
                 #error("bsim3 not supported")
                 #return :bsim3
             elseif level == 14 || level == 54
-                return :bsim4
+                return GlobalRef(BSIM4, :bsim4)
             elseif level == 17 || level == 72
                 if version == 107 || version === nothing
                     return :bsimcmg107
@@ -704,7 +703,7 @@ function (to_julia::SpcScope)(n::SNode{SP.Model}, bins::Dict{Symbol, Vector{Symb
 
     # some devices have a version parameter
     # while others have distinct models
-    if version !== nothing && dev in (:bsim4,)
+    if version !== nothing && dev.name in (:bsim4,)
         push!(params, Expr(:kw, :version, Expr(:call, mknondefault, version)))
     end
 

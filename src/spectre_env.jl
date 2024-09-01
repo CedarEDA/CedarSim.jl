@@ -203,6 +203,8 @@ const tran = :tran
 export resistor, capacitor, inductor, vsource, isource, bsource, vcvs, vccs, UnimplementedDevice,
     M_1_PI, dc, ac, tran, pwl, pulse, spsin, var"$time", Gnd, agauss, temper
 
+var"$scale"() = CedarSim.undefault(CedarSim.options[].scale)
+
 end # baremodule SpectreEnvironment
 
 export SpectreEnvironment

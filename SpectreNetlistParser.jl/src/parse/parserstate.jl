@@ -13,9 +13,10 @@ mutable struct ParseState{L <: Lexer}
     started::Bool
     errored::Bool
     lang_swapped::Bool
+    line_offset::Int
 end
 
-function ParseState(io::IOBuffer; fname = nothing, enable_julia_escape::Bool=false)
+function ParseState(io::IOBuffer; fname = nothing, enable_julia_escape::Bool=false, line_offset::Int=0)
     uz = UInt32(0)
     p = position(io)
     sstr = read(io, String)
@@ -27,7 +28,8 @@ function ParseState(io::IOBuffer; fname = nothing, enable_julia_escape::Bool=fal
         UInt32(p), uz, UInt32(p),
         false,
         false,
-        false)
+        false,
+        line_offset)
     get_next_token(ps)
     next(ps)
     return ps

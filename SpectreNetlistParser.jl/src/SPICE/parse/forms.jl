@@ -391,7 +391,7 @@ struct MOSFET <: AbstractInstanceNode
     s::EXPR{NodeName}
     b::EXPR{NodeName}
     model::EXPR{NodeName}
-    parameters::EXPRList{Parameter}
+    params::EXPRList{Parameter}
     nl::EXPR{Notation}
 end
 
@@ -400,7 +400,7 @@ struct SParameterElement <: AbstractInstanceNode
     nd1::EXPR{NodeName}
     nd2::EXPR{NodeName}
     model::EXPR{NodeName}
-    parameters::EXPRList{Parameter}
+    params::EXPRList{Parameter}
     nl::EXPR{Notation}
 end
 
@@ -433,7 +433,7 @@ struct SubcktCall <: AbstractInstanceNode
     # TODO: Probably not right:
     nodes::EXPRList{NodeName}
     model::EXPR{NodeName}
-    parameters::EXPRList{Parameter}
+    params::EXPRList{Parameter}
     nl::EXPR{Notation}
 end
 

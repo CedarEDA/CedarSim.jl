@@ -18,19 +18,20 @@ mutable struct ParseState{L <: Lexer}
     errored::Bool
     lang_swapped::Bool
     return_on_language_change::Bool
+    line_offset::Int
 end
 
-function ParseState(io::IOBuffer; fname::Union{AbstractString, Nothing} = nothing, return_on_language_change::Bool, enable_julia_escape::Bool=false, implicit_title::Bool=true)
+function ParseState(io::IOBuffer; fname::Union{AbstractString, Nothing} = nothing, return_on_language_change::Bool, enable_julia_escape::Bool=false, implicit_title::Bool=true, line_offset=0)
     p = position(io)
     sstr = read(io, String)
     seek(io, p)
     sourcefile = SourceFile(sstr)
     srcfile = SrcFile(fname, io, sourcefile)
-    return ParseState(srcfile; return_on_language_change, enable_julia_escape, implicit_title)
+    return ParseState(srcfile; return_on_language_change, enable_julia_escape, implicit_title, line_offset)
 end
 
 
-function ParseState(srcfile::SrcFile; return_on_language_change::Bool, enable_julia_escape::Bool=false, implicit_title::Bool=true)
+function ParseState(srcfile::SrcFile; return_on_language_change::Bool, enable_julia_escape::Bool=false, implicit_title::Bool=true, line_offset::Int=0)
     p = position(srcfile.contents)
     uz = UInt32(0)
     l = Lexer(srcfile.contents, ERROR, next_token; case_sensitive=false, enable_julia_escape)
@@ -44,7 +45,8 @@ function ParseState(srcfile::SrcFile; return_on_language_change::Bool, enable_ju
         false,
         false,
         false,
-        return_on_language_change)
+        return_on_language_change,
+        line_offset)
     get_next_token(ps)
     next(ps)
     next(ps)
@@ -118,7 +120,6 @@ function resolve_identifier(ps::ParseState, tok::Token)
     end
     return str
 end
-
 
 function next(ps::ParseState)
     ps.t = ps.nt

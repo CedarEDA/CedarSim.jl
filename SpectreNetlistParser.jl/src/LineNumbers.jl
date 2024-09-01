@@ -26,7 +26,7 @@ end
 
 function compute_line(file::SourceFile, offset)
     ind = searchsortedfirst(file.offsets, offset)
-    ind <= length(file.offsets) && file.offsets[ind] == offset ? ind : ind - 1
+    (ind <= length(file.offsets) && file.offsets[ind] == offset ? ind : ind - 1)
 end
 
 function getindex(file::SourceFile, line::Int)
