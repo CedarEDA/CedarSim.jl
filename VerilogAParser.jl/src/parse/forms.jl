@@ -125,7 +125,7 @@ allchildren(v::ValueRange) = (v.vtype, v.r)
 struct ParamAssignment
     id::EXPR{Identifier}
     prange::Maybe{EXPR}
-    eq::EXPR{Notation}
+    eq::EXPRErr{Notation}
     default_expr::EXPR
     value_range::Maybe{EXPRList{ValueRange}}
 end

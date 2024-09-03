@@ -711,8 +711,8 @@ function visit_errors(va; io=stdout, verbose=false)
                     print_snippet(io, va.ps, contextrange, annotations)
                     println(io, "Unexpected semicolon.")
                     return false
-                elseif isoperator(theerror.got)
-                    
+                elseif theerror.got !== nothing && isoperator(theerror.got)
+
                     printstyled(io, "╭ ERROR [VAS99]:", bold=true, color=:red)
                     printstyled(io, " Unexpected operator.", color=:red)
                     println(io)

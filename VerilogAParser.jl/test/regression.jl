@@ -32,6 +32,26 @@ let res = VerilogAParser.parse(var)
     @test String(rhs.op) == "+"
 end
 
+# Formal argument expansion of first token in a macro (https://github.com/CedarEDA/CedarSim.jl/issues/6)
+let va = VerilogAParser.parse("""
+        `define DefACparam(param_i,param_dc,param_ac) \
+           param_i =  (param_dc); \
+           if (\$param_given(param_ac) == 1) \
+               param_i =  (param_ac);
+
+        module test(x);
+               parameter real PLCF=1, PLCFAC=1;
+               real PLCFAC_i;
+               analog begin
+                       `DefACparam(PLCFAC_i,       PLCF,       PLCFAC)
+               end
+        endmodule
+        """)
+    # param_i in the bad version - should have been substituted
+    @test String(va.stmts[1].items[end].item.stmt.stmt.stmts[1].stmt.assign.lvalue) == PLCFAC_i
+end
+
+# Inferability of next_token
 using Lexers
 @test only(Base.return_types(VerilogAParser.VerilogATokenize.next_token, Tuple{Lexers.Lexer{IOBuffer, VerilogAParser.VerilogATokenize.Tokens.Kind,
                                                                           typeof(VerilogAParser.VerilogATokenize.next_token)}, Bool})) ==
