@@ -5,7 +5,9 @@ using .SpectreNetlistCSTParser:
     SpectreNetlistSource
 using .SPICENetlistCSTParser:
     SPICENetlistSource
+using VerilogAParser
 const SNode = SpectreNetlistCSTParser.Node
+const VANode = VerilogAParser.VerilogACSTParser.Node
 const SC = SpectreNetlistCSTParser
 const SP = SPICENetlistCSTParser
 
@@ -100,7 +102,9 @@ VD D 0 PWL(
 + 400.0e-9 1.8
 + )
 
-.LIB "jlpkg://IHP_SG13G2/../ngspice/models/cornerMOSlv.lib" mos_tt
+*.hdl "jlpkg://CMC/cmc_models/PSP103.8.2/psp103_nqs.va"
+.hdl "/home/keno/.julia/packages/CMC/gDuGv/cmc_models/PSP103.8.2/psp103_nqs.va"
+.LIB "jlpkg://IHP_SG13G2/models/cornerMOSlv.lib" mos_tt
 .END
 """
 

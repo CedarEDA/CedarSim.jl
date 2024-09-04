@@ -1,14 +1,17 @@
 using OrderedCollections
 using Graphs
 using GF180MCUPDK
+using VerilogAParser
 
 const JLPATH_PREFIX = "jlpkg://"
 
-struct ConditionalDef
-    cond::SNode
-    then::Vector{Pair{UInt, Union{SNode, ConditionalDef}}}
-    not::Vector{Pair{UInt, Union{SNode, ConditionalDef}}}
+struct MaybeConditional{T}
+    cond::Int # 0 indicates not conditional, negative indicates inverted
+    val::T
 end
+Base.convert(::Type{MaybeConditional{T}}, x::T) where T = MaybeConditional{T}(0, x)
+Base.convert(::Type{MaybeConditional{SNode}}, x::SNode) = MaybeConditional{SNode}(0, x)
+Base.convert(::Type{MaybeConditional{Pair{SNode, GlobalRef}}}, x::Pair{<:SNode, GlobalRef}) = MaybeConditional{Pair{SNode, GlobalRef}}(0, x)
 
 @enum CircuitKind begin
     SPICECircuit
@@ -22,6 +25,7 @@ struct SemaSpec
     includepaths::Vector{String}
     pdkincludepaths::Vector{String}
     imps::Union{Nothing, Module, Dict{Symbol, Module}}
+    hdl_imps::Union{Nothing, Module, Dict{String, Module}}
 end
 
 mutable struct SemaResult
@@ -32,15 +36,18 @@ mutable struct SemaResult
     global_position::UInt64
     kind::CircuitKind
 
-    nets::Dict{Symbol, Vector{Pair{UInt, Union{SNode, ConditionalDef}}}}
+    conditionals::Vector{Pair{UInt, MaybeConditional{SNode}}}
+    condition_stack::Vector{Int}
 
-    params::OrderedDict{Symbol, Vector{Pair{UInt, Union{SNode, ConditionalDef}}}}
-    models::Dict{Symbol, Vector{Pair{UInt, Pair{SNode, GlobalRef}}}}
-    subckts::Dict{Symbol, Vector{Pair{UInt, Union{SemaResult, ConditionalDef}}}}
+    nets::Dict{Symbol, Vector{Pair{UInt, MaybeConditional{SNode}}}}
+    params::OrderedDict{Symbol, Vector{Pair{UInt, MaybeConditional{SNode}}}}
+    models::Dict{Symbol, Vector{Pair{UInt, MaybeConditional{Pair{SNode, GlobalRef}}}}}
+    subckts::Dict{Symbol, Vector{Pair{UInt, MaybeConditional{SemaResult}}}}
     libs::Dict{Symbol, Vector{Union{Pair{UInt, SemaSpec}, Pair{UInt, SemaResult}}}}
     options::Dict{Symbol, Vector{Pair{UInt, SNode}}}
 
-    instances::OrderedDict{Symbol, Pair{UInt, Union{SNode, ConditionalDef}}}
+    instances::OrderedDict{Symbol, Pair{UInt, MaybeConditional{SNode}}}
+    hdl_includes::Vector{Pair{UInt, Pair{SNode, VANode}}}
 
     warnings::Vector
 
@@ -57,24 +64,26 @@ mutable struct SemaResult
     pdkincludepaths::Vector{String}
 
     imps::Union{Nothing, Module, Dict{Symbol, Module}}
+    hdl_imps::Union{Nothing, Module, Dict{String, Module}}
 end
 
 function SemaResult(ast::SNode)
     SemaResult(ast, nothing, nothing, UInt64(0), SpectreCircuit,
-        Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Vector(),
+        Vector{Pair{UInt, MaybeConditional{SNode}}}(), Vector{UInt}(),
+        Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Vector(), Vector(),
         OrderedSet{Symbol}(), OrderedSet{Symbol}(), OrderedSet{Symbol}(),
         OrderedSet{Symbol}(),
-        Int[], Vector{String}(), Vector{String}(), nothing)
+        Int[], Vector{String}(), Vector{String}(), nothing, nothing)
 end
 
 function SemaSpec(scope::SemaResult, ast::SNode)
-    SemaSpec(ast, copy(scope.includepaths), copy(scope.pdkincludepaths), scope.imps)
+    SemaSpec(ast, copy(scope.includepaths), copy(scope.pdkincludepaths), scope.imps, scope.hdl_imps)
 end
 
 const TwoTerminal = Union{SNode{SP.Resistor}, SNode{SP.Inductor}, SNode{SP.Capacitor},
     SNode{SP.Diode}, SNode{SP.Voltage}, SNode{SP.Current}}
 
-const AnySPInstance = Union{SNode{SP.MOSFET}, SNode{SP.SubcktCall},
+const AnySPInstance = Union{SNode{SP.MOSFET}, SNode{SP.SubcktCall}, SNode{SP.VAModelCall},
     SNode{SP.BipolarTransistor}, SNode{SP.Behavioral},
     SNode{SP.CCVS}, SNode{SP.CCCS}, SNode{SP.VCVS}, SNode{SP.VCCS},
     SNode{SP.Switch}, SNode{SP.JuliaDevice}, TwoTerminal}
@@ -86,7 +95,7 @@ end
 sema_nets(instance::TwoTerminal) = (instance.pos, instance.neg)
 sema_nets(instance::SNode{SP.MOSFET}) = (instance.d, instance.g, instance.s, instance.b)
 sema_nets(instance::SNode{SP.BipolarTransistor}) = (instance.c, instance.b, instance.e, instance.s)
-sema_nets(instance::SNode{SP.SubcktCall}) = instance.nodes
+sema_nets(instance::Union{SNode{SP.SubcktCall}, SNode{SP.VAModelCall}}) = instance.nodes
 
 """
     SPICE/Spectre codegen pass 1
@@ -145,6 +154,11 @@ function sema_visit_ids!(f, cs::Union{SNode{SC.UnaryOp}, SNode{SP.UnaryOp}})
     sema_visit_ids!(f, cs.operand)
 end
 
+function sema_visit_ids!(f, cs::SNode{SP.Parameter})
+    # TODO: Lot/Dev?
+    sema_visit_ids!(f, cs.val)
+end
+
 sema_visit_ids!(f, expr::Union{SNode{SP.NumericValue}, SNode{SC.NumericValue}}) = nothing
 sema_visit_ids!(f, ::Nothing) = nothing
 
@@ -172,7 +186,7 @@ function get_section!(scope::SemaResult, name::Symbol)
         sect = scope.libs[name][end]
         if !isa(sect[2], SemaResult)
             spec = sect[2]::SemaSpec
-            semad = sema_file_or_section(spec.ast; includepaths=spec.includepaths, imps=spec.imps)
+            semad = sema_file_or_section(spec.ast; includepaths=spec.includepaths, imps=spec.imps, hdl_imps=spec.hdl_imps)
             scope.libs[name][end] = sect[1]=>semad
             return semad
         end
@@ -230,6 +244,12 @@ function spice_select_device(sema::SemaResult, devkind, level, version, stmt; di
             return GlobalRef(CedarSim.SpectreEnvironment, :Switch)
         end
     end
+    # Search for this model in the HDL Imports
+    for (_, mod) in sema.hdl_imps
+        if isdefined(mod, devkind)
+            return GlobalRef(mod, devkind)
+        end
+    end
     file = stmt.ps.srcfile.path
     line = SpectreNetlistParser.LineNumbers.compute_line(stmt.ps.srcfile.lineinfo, stmt.startof)
     @warn "Device $devkind at level $level not implemented" _file=file _line=line
@@ -243,22 +263,15 @@ function sema_visit_model!(scope::SemaResult, stmt::SNode{SP.Model})
     end
 
     typ = LSymbol(stmt.typ)
-    mosfet_type = typ in (:nmos, :pmos) ? typ : nothing
     level = nothing
     version = nothing
     for param in stmt.parameters
         sema_visit_expr!(scope, param.val)
 
         pname = LSymbol(param.name)
-        if pname == :type
-            pname = :devtype
-            val = LSymbol(param.val)
-            @assert val in (:p, :n)
-            mosfet_type = val == :p ? :pmos : :nmos
-            continue
-        elseif pname == :level
+        if pname == :level
             # TODO
-            level = Int(parse(Float64, String(param.val)))
+            level = parse(Float64, String(param.val))
             continue
         elseif pname == :version
             version = parse(Float64, String(param.val))
@@ -268,12 +281,9 @@ function sema_visit_model!(scope::SemaResult, stmt::SNode{SP.Model})
     modelref = spice_select_device(scope, typ, level, version, stmt)
 
     push!(get!(()->[], scope.models, name), scope.global_position=>(stmt=>modelref))
-    for param in stmt.parameters
-        sema_visit_expr!(scope, param.val)
-    end
 end
 
-function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.Subckt}, SNode{SP.LibStatement}})
+function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.Subckt}, SNode{SP.LibStatement}, SNode{SP.IfElseCase}})
     if isa(n, SNode{SP.Subckt})
         for param in n.parameters
             name = LSymbol(param.name)
@@ -290,7 +300,7 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
             scope.title = stmt
         elseif isa(stmt, SNode{SC.Instance}) || isa(stmt, AnySPInstance)
             name = LSymbol(stmt.name)
-            if haskey(scope.instances, name)
+            if haskey(scope.instances, name) && isempty(scope.condition_stack)
                 error("Duplicate instance name $name")
             end
             scope.instances[name] = scope.global_position=>stmt
@@ -309,7 +319,7 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
                     sema_visit_expr!(scope, param.val)
                 end
             end
-            if isa(stmt, SNode{SP.MOSFET})
+            if isa(stmt, SNode{SP.MOSFET}) || isa(stmt, SNode{SP.VAModelCall})
                 push!(scope.exposed_models, LSymbol(stmt.model))
             end
             if isa(stmt, SNode{SP.Resistor})
@@ -324,7 +334,8 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
             if haskey(scope.subckts, name)
                 warn!(scope, "Duplicate subcircuit definition $name")
             end
-            push!(get!(()->[], scope.subckts, name), scope.global_position=>sema(stmt; includepaths=scope.includepaths, imps=scope.imps))
+            @show name
+            push!(get!(()->[], scope.subckts, name), scope.global_position=>sema(stmt; includepaths=scope.includepaths, imps=scope.imps, hdl_imps=scope.hdl_imps))
         elseif isa(stmt, SNode{SP.LibStatement})
             name = LSymbol(stmt.name)
             if haskey(scope.subckts, name)
@@ -343,7 +354,7 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
                 push!(get!(()->[], scope.params, name), scope.global_position=>param)
                 sema_visit_expr!(scope, param.val)
             end
-        elseif isa(stmt, SNode{SP.IncludeStatement}) || isa(stmt, SNode{SP.LibInclude})
+        elseif isa(stmt, SNode{SP.IncludeStatement}) || isa(stmt, SNode{SP.LibInclude}) || isa(stmt, SNode{SP.HDLStatement})
             str = strip(unescape_string(String(stmt.path)), ['"', '\'']) # verify??
             if startswith(str, JLPATH_PREFIX)
                 path = str[sizeof(JLPATH_PREFIX)+1:end]
@@ -352,18 +363,42 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
                 imp_mod = sema_resolve_import(scope, imp)
                 path = joinpath(dirname(pathof(imp_mod)), "..", components[2:end]...)
                 imps = imp_mod
+                hdl_imps = #=imp_mod=# scope.hdl_imps
             else
                 ispdk, path = resolve_includepath(str, scope.includepaths, scope.pdkincludepaths)
                 imps = scope.imps
+                hdl_imps = scope.hdl_imps
             end
-            sa = SP.parsefile(path; implicit_title=false)
-            includee = sema_file_or_section(sa; includepaths=[dirname(path); scope.includepaths], imps=imps)
-            if isa(stmt, SNode{SP.LibInclude})
-                includee = get_section!(includee, LSymbol(stmt.name))
+            path = String(path)
+            if isa(stmt, SNode{SP.HDLStatement})
+                isempty(scope.condition_stack) || error("HDL includes not allowed in conditional blocks")
+                if !isa(scope.hdl_imps, Module) && (scope.hdl_imps === nothing || !haskey(scope.hdl_imps, path))
+                    #error("HDL import $path not provided to sema")
+                end
+            else
+                sa = SP.parsefile(path; implicit_title=false)
+                includee = sema_file_or_section(sa; includepaths=[dirname(path); scope.includepaths], imps=imps, hdl_imps=hdl_imps)
+                if isa(stmt, SNode{SP.LibInclude})
+                    includee = get_section!(includee, LSymbol(stmt.name))
+                end
+                sema_include!(scope, includee)
             end
-            sema_include!(scope, includee)
         elseif isa(stmt, SNode{SP.Tran}) || isa(stmt, SNode{SP.EndStatement})
             # Ignore for Sema purposes
+        elseif isa(stmt, SNode{SP.IfBlock})
+            depth = length(scope.condition_stack)
+            for case in stmt.cases
+                if case.condition === nothing
+                    sema!(scope, case)
+                else
+                    push!(scope.conditionals, scope.global_position=>case.condition)
+                    cond_id = length(scope.conditionals)
+                    push!(scope.condition_stack, cond_id)
+                    sema!(scope, case)
+                    push!(scope.condition_stack, -cond_id)
+                end
+            end
+            resize!(scope.condition_stack, depth)
         else
             @show stmt
             error()
@@ -390,9 +425,12 @@ function sema_include!(scope::SemaResult, includee::SemaResult)
     for (name, defs) in includee.options
         push!(get!(()->[], scope.options, name), defs...)
     end
+    union!(scope.exposed_parameters, includee.exposed_parameters)
+    union!(scope.exposed_models, includee.exposed_models)
+    union!(scope.exposed_subckts, includee.exposed_subckts)
 end
 
-function sema_file_or_section(n::SNode; includepaths=nothing, imps=nothing)
+function sema_file_or_section(n::SNode; includepaths=nothing, imps=nothing, hdl_imps=nothing)
     scope = SemaResult(n)
     if includepaths !== nothing
         scope.includepaths = includepaths
@@ -400,11 +438,15 @@ function sema_file_or_section(n::SNode; includepaths=nothing, imps=nothing)
     if imps !== nothing
         scope.imps = imps
     end
+    if hdl_imps !== nothing
+        scope.hdl_imps = hdl_imps
+    end
     sema!(scope, n)
     scope
 end
 
-function sema(n::SNode; includepaths=nothing, imps = nothing)
+function sema(n::SNode; includepaths=nothing, imps = nothing, hdl_imps=nothing)
+    @show hdl_imps
     scope = SemaResult(n)
     if includepaths !== nothing
         scope.includepaths = includepaths
@@ -416,6 +458,13 @@ function sema(n::SNode; includepaths=nothing, imps = nothing)
             scope.imps = imps
         end
     end
+    if hdl_imps !== nothing
+        if isa(hdl_imps, Tuple)
+            scope.hdl_imps = Dict(hdl_imps...)
+        else
+            scope.hdl_imps = hdl_imps
+        end
+    end
     sema!(scope, n)
     resolve_scopes!(scope)
     scope
@@ -423,7 +472,7 @@ end
 
 #=============================== Scope Resultion ==============================#
 function resolve_subckt(sema::SemaResult, name::Symbol)
-    sema.subckts[name][end][2]
+    sema.subckts[name][end][2].val
 end
 
 function resolve_scopes!(sr::SemaResult)
@@ -456,7 +505,7 @@ function resolve_scopes!(sr::SemaResult)
     idx_lookup = Dict{Symbol, Int}(sym=>id for (id, (sym, _)) in enumerate(sr.params))
     for (n, (name, defs)) in enumerate(sr.params)
         def = defs[end]
-        sema_visit_ids!(def[2].val) do name
+        sema_visit_ids!(def[2].val.val) do name
             push!(sr.exposed_parameters, name)
             if haskey(idx_lookup, name)
                 add_edge!(graph, idx_lookup[name], n)
@@ -514,7 +563,7 @@ function sema_assign_ids(r::SemaResult)
     subs = Expr(:block)
     for (_, sublist) in r.subckts
         for (_, sub) in sublist
-            push!(subs.args, sema_assign_ids(sub))
+            push!(subs.args, sema_assign_ids(sub.val))
         end
     end
     quote
@@ -524,4 +573,12 @@ function sema_assign_ids(r::SemaResult)
         $(subs.args...)
         SpCircuit{$s, Tuple{}}((;), (;))
     end
+end
+
+function sema_codegen_hdl(r::SemaResult)
+    ret = Expr(:toplevel)
+    for (_, (_, va)) in r.hdl_includes
+        push!(ret.args, CedarSim.make_module(va))
+    end
+    return ret
 end

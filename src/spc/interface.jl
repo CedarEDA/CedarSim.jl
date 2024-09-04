@@ -48,14 +48,16 @@ function analyze_mosfet_import(dialect, level)
     return nothing
 end
 
-function analyze_imports!(n::SNode; imports=Set{String}())
+function analyze_imports!(n::SNode; imports=Set{String}(), hdl_imports=Set{String}())
     for stmt in n.stmts
-        if isa(stmt, SNode{SP.IncludeStatement}) || isa(stmt, SNode{SP.LibInclude})
+        if isa(stmt, SNode{SP.IncludeStatement}) || isa(stmt, SNode{SP.LibInclude}) || isa(stmt, SNode{SP.HDLStatement})
             str = strip(unescape_string(String(stmt.path)), ['"', '\'']) # verify??
             if startswith(str, JLPATH_PREFIX)
                 path = str[sizeof(JLPATH_PREFIX)+1:end]
                 components = splitpath(path)
                 push!(imports, components[1])
+            else
+                push!(hdl_imports, str)
             end
         elseif isa(stmt, SNode{SP.Model})
             typ = LSymbol(model.typ)
@@ -79,10 +81,10 @@ function analyze_imports!(n::SNode; imports=Set{String}())
             imp = analyze_mosfet_import(:ngspice, level)
             imp !== nothing && push!(imports, imp)
         elseif isa(stmt, Union{SNode{SPICENetlistSource}, SNode{SP.Subckt}, SNode{SP.LibStatement}})
-            analyze_imports!(stmt, imports=imports)
+            analyze_imports!(stmt; imports, hdl_imports)
         end
     end
-    return imports
+    return imports, hdl_imports
 end
 
 macro sp_str(str, flag="")
@@ -91,18 +93,36 @@ macro sp_str(str, flag="")
     inline = 'i' in flag
     sa = SpectreNetlistParser.parse(IOBuffer(str); start_lang=:spice, enable_julia_escape,
         implicit_title = !inline, fname=String(__source__.file), line_offset=__source__.line-1)
-    imports = analyze_imports!(sa)
-    if isempty(imports)
+    imports, hdl_imports = analyze_imports!(sa)
+    if isempty(imports) && isempty(hdl_imports)
         return sema_assign_ids(sema(sa))
     end
     t = Expr(:toplevel)
+    hdls = Expr[]
     kws = Expr[]
+    # Codegen top-level HDL imports
+    for imp in hdl_imports
+        va = VerilogAParser.parsefile(imp)
+
+        vamod = va.stmts[end]
+        s = gensym(String(vamod.id))
+        push!(t.args, esc(:(baremodule $s
+            using ..CedarSim.VerilogAEnvironment
+            $(CedarSim.make_spice_device(vamod))
+            const $(Symbol(lowercase(String(vamod.id)))) = $(Symbol(vamod.id))
+        end)))
+
+        push!(hdls, :($imp => $s))
+    end
     for imp in imports
         s = gensym()
         imp = Symbol(imp)
         push!(t.args, :(import $imp as $s))
         push!(kws, Expr(:kw, imp, s))
     end
-    push!(t.args, :(eval($(sema_assign_ids)($(sema)($sa; imps=(;$(kws...)))))))
+    push!(t.args, quote
+        s = $(sema)($sa; imps=(;$(kws...)), hdl_imps=($(hdls...),))
+        eval($(sema_assign_ids)(s))
+    end)
     return t
 end

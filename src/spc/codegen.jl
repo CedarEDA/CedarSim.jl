@@ -188,6 +188,13 @@ function cg_expr!(state::CodegenState, cs::Union{SNode{SC.Identifier}, SNode{SP.
     return cg_expr!(state, id)
 end
 
+function cg_expr!(state::CodegenState, cs::Union{SNode{SC.TernaryExpr}, SNode{SP.TernaryExpr}})
+    return Expr(:if,
+        cg_expr!(state, cs.condition),
+        cg_expr!(state, cs.ifcase),
+        cg_expr!(state, cs.elsecase))
+end
+
 cg_expr!(state::CodegenState, n::Union{SNode{SP.Brace}, SNode{SC.Parens}, SNode{SP.Parens}, SNode{SP.Prime}}) = cg_expr!(state, n.inner)
 
 function cg_params!(state::CodegenState, params)
@@ -214,19 +221,20 @@ end
 
 function cg_instance!(state::CodegenState, instance::SNode{SP.SubcktCall})
     ssema = resolve_subckt(state.sema, LSymbol(instance.model))
-    params = Expr[Expr(:kw, name, cg_expr!(state, name)) for name in ssema.exposed_parameters]
+    implicit_params = Expr[Expr(:kw, name, cg_expr!(state, name)) for name in ssema.exposed_parameters]
     passed_parameters = OrderedDict{Symbol, SNode}()
     callee_codegen = CodegenState(ssema)
-    ca = :(let; end)
+    s = gensym()
+    ca = :(let $s=(;$(implicit_params...)); end)
     params = Symbol[]
     for passed_param in instance.params
-        name = LSymbol(passed_param)
+        name = LSymbol(passed_param.name)
         # TODO: Pull up dependencies to this level
         def = cg_expr!(callee_codegen, passed_param.val)
         push!(ca.args[end].args, :($name = $def))
         push!(params, name)
     end
-    push!(ca.args[end].args, Expr(:tuple, Expr(:parameters, params...)))
+    push!(ca.args[end].args, Expr(:call, merge, s, Expr(:tuple, Expr(:parameters, params...))))
     params = ca
     models = Expr(:tuple, Expr(:parameters, [Expr(:kw, name, cg_expr!(state, name)) for name in ssema.exposed_models]...))
     subckts = Expr(:tuple, [resolve_subckt(state.sema, name).CktID for name in ssema.exposed_subckts]...)
@@ -235,6 +243,11 @@ function cg_instance!(state::CodegenState, instance::SNode{SP.SubcktCall})
     end
     ret = :(SpCircuit{$(ssema.CktID), $subckts}($params, $models)($(port_exprs...)))
     ret
+end
+
+function cg_instance!(state::CodegenState, instance::SNode{SP.VAModelCall})
+    model = cg_model_name!(state, LSymbol(instance.model))
+    return cg_spice_instance!(state, sema_nets(instance), instance.name, model, cg_params!(state, instance.params))
 end
 
 function cg_instance!(state::CodegenState, instance::SNode{SP.Resistor})
@@ -323,21 +336,22 @@ function cg_model_def!(state::CodegenState, (model, modelref)::Pair{<:SNode, Glo
     for p in model.parameters
         name = LSymbol(p.name)
         if name == :type
-            name = :devtype
             val = LSymbol(p.val)
-            @assert val in (:p, :n)
-            mosfet_type = val == :p ? :pmos : :nmos
-            continue
+            if val in (:p, :n)
+                name = :devtype
+                mosfet_type = val == :p ? :pmos : :nmos
+                continue
+            end
+            # Default handling - no rewrite
         elseif name == :level
             # TODO
-            level = Int(parse(Float64, String(p.val)))
+            level = parse(Float64, String(p.val))
             continue
         elseif name == :version
             version = parse(Float64, String(p.val))
             continue
-        else
-            val = cg_expr!(state, p.val)
         end
+        val = cg_expr!(state, p.val)
         push!(params, Expr(:kw, name, Expr(:call, CedarSim.mknondefault, val)))
     end
 
@@ -403,7 +417,7 @@ function codegen!(state::CodegenState)
     end
     # Codegen parameter defs
     for (name, defs) in collect(state.sema.params)[state.sema.parameter_order]
-        def = cg_expr!(state, defs[end][2].val)
+        def = cg_expr!(state, defs[end][2].val.val)
         if name in state.sema.formal_parameters
             push!(block.args, :($name = hasfield(typeof(var"*params#"), $(QuoteNode(name))) ? getfield(var"*params#", $(QuoteNode(name))) : $def))
         else
@@ -418,7 +432,7 @@ function codegen!(state::CodegenState)
     end
     for (model, defs) in state.sema.models
         name = cg_model_name!(state, model)
-        model_def = cg_model_def!(state, defs[end][2], bins)
+        model_def = cg_model_def!(state, defs[end][2].val, bins)
         push!(block.args, :($name = $model_def))
     end
     # Binned model aggregation
@@ -427,6 +441,7 @@ function codegen!(state::CodegenState)
         push!(block.args, :($name = $(CedarSim.BinnedModel)($(GlobalRef(SpectreEnvironment, :var"$scale"))(), ($(this_bins...),))))
     end
     for (_, (global_pos, instance)) in state.sema.instances
+        instance = instance.val
         push!(block.args, LineNumberNode(instance))
         push!(block.args, cg_instance!(state::CodegenState, instance))
     end

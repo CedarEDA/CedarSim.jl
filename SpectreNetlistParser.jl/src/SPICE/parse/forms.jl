@@ -437,6 +437,13 @@ struct SubcktCall <: AbstractInstanceNode
     nl::EXPR{Notation}
 end
 
+struct VAModelCall <: AbstractInstanceNode
+    name::EXPR{NodeName}
+    nodes::EXPRList{NodeName}
+    model::EXPR{NodeName}
+    params::EXPRList{Parameter}
+    nl::EXPR{Notation}
+end
 
 struct Subckt <: AbstractBlockASTNode
     dot::EXPR{Notation}

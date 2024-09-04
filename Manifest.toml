@@ -2,7 +2,7 @@
 
 julia_version = "1.12.0-DEV"
 manifest_format = "2.0"
-project_hash = "5f6d92690e236007cfedb5463fff261add26b2b4"
+project_hash = "811b31022f66eb2395a7f0f9a1724d2a1a78c000"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "6778bcc27496dae5723ff37ee30af451db8b35fe"
@@ -255,7 +255,9 @@ version = "0.5.0"
 
 [[deps.CMC]]
 deps = ["CedarSim"]
-git-tree-sha1 = "314d5b421e5442034f61bf0eea8f8ca2ea1d75d2"
+git-tree-sha1 = "1faf28f97318e59ecec31bfb66e6d746890816e2"
+repo-rev = "main"
+repo-url = "https://github.com/CedarEDA/CMC.jl.git"
 uuid = "db13d295-e716-48aa-bdca-f6cce3d4ecc6"
 version = "0.3.0"
 
@@ -323,7 +325,7 @@ uuid = "d78b62d4-37fa-4a6f-acd8-2f19986eb9ee"
 version = "0.2.1"
 
 [[deps.CedarSim]]
-deps = ["ADTypes", "AbstractAlgebra", "AbstractTrees", "Accessors", "AxisKeys", "CassetteOverlay", "ChainRules", "ChainRulesCore", "Combinatorics", "Compat", "DAECompiler", "DecFP", "DescriptorSystems", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DynamicScope", "ExprTools", "ForwardDiff", "Graphs", "Lexers", "LinearAlgebra", "LinearSolve", "Logging", "NLsolve", "NaNMath", "NonlinearSolve", "OrderedCollections", "OrdinaryDiffEq", "PrecompileTools", "Random", "SciMLBase", "SciMLNLSolve", "SciMLSensitivity", "Scratch", "SpectreNetlistParser", "StateSelection", "StaticArrays", "StructArrays", "Sundials", "SymbolicIndexingInterface", "VT100", "VectorPrisms", "VerilogAParser"]
+deps = ["ADTypes", "AbstractAlgebra", "AbstractTrees", "Accessors", "AxisKeys", "CassetteOverlay", "ChainRules", "ChainRulesCore", "Combinatorics", "Compat", "DAECompiler", "DecFP", "DescriptorSystems", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DynamicScope", "ExprTools", "ForwardDiff", "Graphs", "IHP_SG13G2", "Lexers", "LinearAlgebra", "LinearSolve", "Logging", "NLsolve", "NaNMath", "NonlinearSolve", "OrderedCollections", "OrdinaryDiffEq", "PrecompileTools", "Random", "SciMLBase", "SciMLNLSolve", "SciMLSensitivity", "Scratch", "SpectreNetlistParser", "StateSelection", "StaticArrays", "StructArrays", "Sundials", "SymbolicIndexingInterface", "VT100", "VectorPrisms", "VerilogAParser"]
 path = "."
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
 version = "0.12.0"

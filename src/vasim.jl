@@ -643,11 +643,8 @@ end
 
 function pins(vm::VANode{VerilogModule})
     plist = vm.port_list
-    plist === nothing && return []
-    pins = Symbol[]
-    mapreduce(vcat, plist.ports) do port_decl
-        Symbol(port_decl.item)
-    end
+    plist === nothing && return Symbol[]
+    pins = Symbol[Symbol(port_decl.item) for port_decl in plist.ports]
 end
 
 using Base.Meta
@@ -854,7 +851,8 @@ function make_spice_device(vm::VANode{VerilogModule})
     end
 
     params_to_locals = map(collect(to_julia.parameters)) do id
-        :($id = $(Expr(:call, undefault, Expr(:call, getfield, Symbol("#self#"), QuoteNode(id)))))
+        idref = get(aliases, id, id)
+        :($id = $(Expr(:call, undefault, Expr(:call, getfield, Symbol("#self#"), QuoteNode(idref)))))
     end
 
     sim = @nolines :(function (var"#self#"::$symname)($(argnames...); dscope=$(GenScope)($(debug_scope)[], $(QuoteNode(symname))))
