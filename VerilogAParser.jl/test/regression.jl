@@ -48,7 +48,50 @@ let va = VerilogAParser.parse("""
         endmodule
         """)
     # param_i in the bad version - should have been substituted
-    @test String(va.stmts[1].items[end].item.stmt.stmt.stmts[1].stmt.assign.lvalue) == PLCFAC_i
+    @test String(va.stmts[1].items[end].item.stmt.stmt.stmts[1].stmt.assign.lvalue) == "PLCFAC_i"
+end
+
+# Formal argument expansion inside macro arg list (https://github.com/CedarEDA/CedarSim.jl/issues/7)
+let va = VerilogAParser.parse("""
+       `define f(arg) arg
+       `define g(arg) `f(arg)
+
+       module test(x);
+               analog begin
+                       `g(VMAX_s) = 1;
+               end
+       endmodule
+       """)
+    # arg in the bad version - should have been substituted
+    @test String(va.stmts[1].items[end].item.stmt.stmt.stmts[1].stmt.assign.lvalue) == "VMAX_s"
+end
+
+let va = VerilogAParser.parse("""
+    `define f(arg) arg
+    `define g(arg) `f(`f(arg))
+
+    module test(x);
+            analog begin
+                    `g(VMAX_s) = 1;
+            end
+    endmodule
+    """)
+    # arg in the bad version - should have been substituted
+    @test String(va.stmts[1].items[end].item.stmt.stmt.stmts[1].stmt.assign.lvalue) == "VMAX_s"
+end
+
+let va = VerilogAParser.parse("""
+    `define f(a) a
+    `define g(b,c) `f((b * c))
+
+    module test(x);
+    real foo;
+    analog begin
+        foo = `g(PBOT, one_over_one_minus_PBOT);
+    end
+    endmodule
+    """)
+    @test String(va.stmts[1].items[end].item.stmt.stmt.stmts[1].stmt.assign.rvalue.inner.rhs) == "one_over_one_minus_PBOT"
 end
 
 # Inferability of next_token
