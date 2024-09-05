@@ -429,11 +429,11 @@ allchildren(bi::BranchIdentifier) = (bi.id, bi.rang)
 struct BranchDeclaration
     kw::EXPR{Keyword}
     lparen::EXPR{Notation}
-    terminal::EXPR #TODO: EXPRList??
+    references::EXPRList{ReferenceListItem}
     rparen::EXPR{Notation}
     ids::EXPRList{ListItem{EXPR{BranchIdentifier}}}
 end
-allchildren(bd::BranchDeclaration) = (bd.kw, bd.lparen, bd.terminal, bd.rparen, bd.ids...)
+allchildren(bd::BranchDeclaration) = (bd.kw, bd.lparen, bd.references..., bd.rparen, bd.ids...)
 
 struct CaseItem
     conds::Union{EXPR{Keyword}, EXPRList{ListItem{EXPR}}}

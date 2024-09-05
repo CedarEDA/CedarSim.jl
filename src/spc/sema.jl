@@ -21,16 +21,15 @@ end
 
 struct SemaSpec
     ast::SNode
-    # We treat these as lexical
-    includepaths::Vector{String}
-    pdkincludepaths::Vector{String}
     imps::Union{Nothing, Module, Dict{Symbol, Module}}
-    hdl_imps::Union{Nothing, Module, Dict{String, Module}}
+    parse_cache::Union{Nothing, CedarParseCache}
+    imported_hdl_modules::Vector{Module}
 end
 
 mutable struct SemaResult
     ast::SNode
     CktID::Union{Nothing, Type}
+    parse_cache::Union{Nothing, CedarParseCache}
 
     title::Union{SNode, Nothing}
     global_position::UInt64
@@ -60,24 +59,22 @@ mutable struct SemaResult
     formal_parameters::OrderedSet{Symbol}
     parameter_order::Vector{Int}
 
-    includepaths::Vector{String}
-    pdkincludepaths::Vector{String}
+    imported_hdl_modules::Vector{Module}
 
     imps::Union{Nothing, Module, Dict{Symbol, Module}}
-    hdl_imps::Union{Nothing, Module, Dict{String, Module}}
 end
 
 function SemaResult(ast::SNode)
-    SemaResult(ast, nothing, nothing, UInt64(0), SpectreCircuit,
+    SemaResult(ast, nothing, nothing, nothing, UInt64(0), SpectreCircuit,
         Vector{Pair{UInt, MaybeConditional{SNode}}}(), Vector{UInt}(),
         Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Dict(), Vector(), Vector(),
         OrderedSet{Symbol}(), OrderedSet{Symbol}(), OrderedSet{Symbol}(),
         OrderedSet{Symbol}(),
-        Int[], Vector{String}(), Vector{String}(), nothing, nothing)
+        Int[], Module[], nothing)
 end
 
 function SemaSpec(scope::SemaResult, ast::SNode)
-    SemaSpec(ast, copy(scope.includepaths), copy(scope.pdkincludepaths), scope.imps, scope.hdl_imps)
+    SemaSpec(ast, scope.imps, scope.parse_cache, scope.imported_hdl_modules)
 end
 
 const TwoTerminal = Union{SNode{SP.Resistor}, SNode{SP.Inductor}, SNode{SP.Capacitor},
@@ -168,25 +165,12 @@ function sema_visit_expr!(scope::SemaResult, @nospecialize(expr))
     end
 end
 
-function resolve_includepath(path, includepaths, pdkincludepaths=[])
-    isfile(path) && return false, path
-    for base in includepaths
-        fullpath = joinpath(base, path)
-        isfile(fullpath) && return false, fullpath
-    end
-    for base in pdkincludepaths
-        fullpath = joinpath(base, path)
-        isfile(fullpath) && return true, fullpath
-    end
-    error("include path $path not found in $includepaths or $pdkincludepaths")
-end
-
 function get_section!(scope::SemaResult, name::Symbol)
     if haskey(scope.libs, name)
         sect = scope.libs[name][end]
         if !isa(sect[2], SemaResult)
             spec = sect[2]::SemaSpec
-            semad = sema_file_or_section(spec.ast; includepaths=spec.includepaths, imps=spec.imps, hdl_imps=spec.hdl_imps)
+            semad = sema_file_or_section(spec.ast; imps=spec.imps, parse_cache=spec.parse_cache, imported_hdl_modules=scope.imported_hdl_modules)
             scope.libs[name][end] = sect[1]=>semad
             return semad
         end
@@ -245,10 +229,9 @@ function spice_select_device(sema::SemaResult, devkind, level, version, stmt; di
         end
     end
     # Search for this model in the HDL Imports
-    for (_, mod) in sema.hdl_imps
-        if isdefined(mod, devkind)
-            return GlobalRef(mod, devkind)
-        end
+    if sema.parse_cache !== nothing
+        # Might be an import instead, which we will resolve later
+        return GlobalRef(sema.parse_cache.thismod, devkind)
     end
     file = stmt.ps.srcfile.path
     line = SpectreNetlistParser.LineNumbers.compute_line(stmt.ps.srcfile.lineinfo, stmt.startof)
@@ -334,8 +317,7 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
             if haskey(scope.subckts, name)
                 warn!(scope, "Duplicate subcircuit definition $name")
             end
-            @show name
-            push!(get!(()->[], scope.subckts, name), scope.global_position=>sema(stmt; includepaths=scope.includepaths, imps=scope.imps, hdl_imps=scope.hdl_imps))
+            push!(get!(()->[], scope.subckts, name), scope.global_position=>sema_file_or_section(stmt; imps=scope.imps, parse_cache=scope.parse_cache, imported_hdl_modules=scope.imported_hdl_modules))
         elseif isa(stmt, SNode{SP.LibStatement})
             name = LSymbol(stmt.name)
             if haskey(scope.subckts, name)
@@ -361,23 +343,44 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
                 components = splitpath(path)
                 imp = Symbol(components[1])
                 imp_mod = sema_resolve_import(scope, imp)
-                path = joinpath(dirname(pathof(imp_mod)), "..", components[2:end]...)
+                path = joinpath(components[2:end]...)
                 imps = imp_mod
-                hdl_imps = #=imp_mod=# scope.hdl_imps
+                parse_cache = imp_mod.var"#cedar_parse_cache#"
+                imported_hdl_modules=Module[]
             else
-                ispdk, path = resolve_includepath(str, scope.includepaths, scope.pdkincludepaths)
                 imps = scope.imps
-                hdl_imps = scope.hdl_imps
+                parse_cache = scope.parse_cache
+                imported_hdl_modules = scope.imported_hdl_modules
+                if isabspath(str)
+                    path = str
+                else
+                    thispath = scope.ast.ps.srcfile.path
+                    if thispath !== nothing
+                        path = isabspath(str) ? str : joinpath(dirname(thispath), str)
+                        # Otherwise, relative to the cache module (handled by the cache)
+                    end
+                end
             end
-            path = String(path)
             if isa(stmt, SNode{SP.HDLStatement})
                 isempty(scope.condition_stack) || error("HDL includes not allowed in conditional blocks")
-                if !isa(scope.hdl_imps, Module) && (scope.hdl_imps === nothing || !haskey(scope.hdl_imps, path))
-                    #error("HDL import $path not provided to sema")
+                vm = parse_and_cache_va!(parse_cache, path)
+                if vm === nothing
+                    error("Preprocessing pass missed HDL include $path")
+                elseif isa(vm, VANode)
+                    error("HDL include $path was not codegen'ed at sema time")
+                else
+                    push!(scope.imported_hdl_modules, vm[2])
                 end
             else
-                sa = SP.parsefile(path; implicit_title=false)
-                includee = sema_file_or_section(sa; includepaths=[dirname(path); scope.includepaths], imps=imps, hdl_imps=hdl_imps)
+                if parse_cache !== nothing
+                    includee = parse_and_cache_spc!(parse_cache, path)
+                else
+                    includee = SpectreNetlistParser.parsefile(path; implicit_title=false)
+                end
+                if !isa(includee, SemaResult)
+                    includee = sema_file_or_section(includee; imps=imps, parse_cache=parse_cache, imported_hdl_modules)
+                    recache_spc!(parse_cache.thismod, path, includee)
+                end
                 if isa(stmt, SNode{SP.LibInclude})
                     includee = get_section!(includee, LSymbol(stmt.name))
                 end
@@ -430,27 +433,21 @@ function sema_include!(scope::SemaResult, includee::SemaResult)
     union!(scope.exposed_subckts, includee.exposed_subckts)
 end
 
-function sema_file_or_section(n::SNode; includepaths=nothing, imps=nothing, hdl_imps=nothing)
+function sema_file_or_section(n::SNode; imps=nothing, parse_cache=nothing, imported_hdl_modules::Vector{Module}=Module[])
     scope = SemaResult(n)
-    if includepaths !== nothing
-        scope.includepaths = includepaths
-    end
     if imps !== nothing
         scope.imps = imps
     end
-    if hdl_imps !== nothing
-        scope.hdl_imps = hdl_imps
+    if parse_cache !== nothing
+        scope.parse_cache = parse_cache
     end
+    scope.imported_hdl_modules = imported_hdl_modules
     sema!(scope, n)
     scope
 end
 
-function sema(n::SNode; includepaths=nothing, imps = nothing, hdl_imps=nothing)
-    @show hdl_imps
+function sema(n::SNode; imps = nothing, parse_cache=nothing, imported_hdl_modules::Vector{Module}=Module[])
     scope = SemaResult(n)
-    if includepaths !== nothing
-        scope.includepaths = includepaths
-    end
     if imps !== nothing
         if isa(imps, NamedTuple)
             scope.imps = Dict(pairs(imps)...)
@@ -458,13 +455,10 @@ function sema(n::SNode; includepaths=nothing, imps = nothing, hdl_imps=nothing)
             scope.imps = imps
         end
     end
-    if hdl_imps !== nothing
-        if isa(hdl_imps, Tuple)
-            scope.hdl_imps = Dict(hdl_imps...)
-        else
-            scope.hdl_imps = hdl_imps
-        end
+    if parse_cache !== nothing
+        scope.parse_cache = parse_cache
     end
+    scope.imported_hdl_modules = imported_hdl_modules
     sema!(scope, n)
     resolve_scopes!(scope)
     scope
@@ -476,6 +470,42 @@ function resolve_subckt(sema::SemaResult, name::Symbol)
 end
 
 function resolve_scopes!(sr::SemaResult)
+    # Go through all models and see if they're from an HDL import instead
+    if sr.parse_cache !== nothing
+        for (name, modeldefs) in sr.models
+            for i = 1:length(modeldefs)
+                (pos, cd) = modeldefs[i]
+                sa, gr = cd.val
+                if gr.mod !== sr.parse_cache.thismod
+                    continue
+                end
+
+                isdefined(gr.mod, gr.name) && continue
+                for imp in sr.imported_hdl_modules
+                    if isdefined(imp, gr.name)
+                        gr = GlobalRef(imp, gr.name)
+                        break
+                    end
+                end
+
+                if gr.mod === sr.parse_cache.thismod
+                    error("Failed to find model $(gr.name)")
+                end
+
+                modeldefs[i] = pos=>MaybeConditional(cd.cond, Pair{SNode, GlobalRef}(sa, gr))
+            end
+        end
+    end
+
+    # Go through all subcircuits and resolve them
+    for (name, subckts) in sr.subckts
+        for i = 1:length(subckts)
+            (pos, cd) = subckts[i]
+            cd.val.CktID !== nothing && continue
+            resolve_scopes!(cd.val)
+        end
+    end
+
     # Go through all subcircuit instances, figure out the appropriate definition,
     # and add all implicit parameters/models/subckts to the exposed lists.
     for (_, (_, instance)) in sr.instances
@@ -559,6 +589,7 @@ function assign_id!(scope::SemaResult, @nospecialize(CktID))
 end
 
 function sema_assign_ids(r::SemaResult)
+    r.CktID !== nothing && return nothing
     s = gensym()
     subs = Expr(:block)
     for (_, sublist) in r.subckts

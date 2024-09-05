@@ -847,8 +847,11 @@ end
 function parse_branch_declaration(ps)
     kw = take_kw(ps, BRANCH)
     lparen = accept(ps, LPAREN)
-    # TODO: Also ports, hierarchies or lists
-    id = accept_identifier(ps)
+    # TODO: Also ports, hierarchies
+    references = EXPRList{ReferenceListItem}()
+    if kind(nt(ps)) != RPAREN
+        parse_comma_list!(parse_reference, ps, references)
+    end
     rparen = accept(ps, RPAREN)
     ids = EXPRList{ListItem{EXPR{BranchIdentifier}}}()
     comma = nothing
@@ -862,7 +865,7 @@ function parse_branch_declaration(ps)
         kind(nt(ps)) == COMMA || break
         comma = take(ps, COMMA)
     end
-    return EXPR(BranchDeclaration(kw, lparen, id, rparen, ids))
+    return EXPR(BranchDeclaration(kw, lparen, references, rparen, ids))
 end
 
 function parse_macro_error!(ps)

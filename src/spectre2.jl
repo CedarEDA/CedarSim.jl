@@ -13,13 +13,13 @@ const SP = SPICENetlistCSTParser
 
 
 using CedarSim
+include(joinpath(dirname(pathof(CedarSim)), "spc/cache.jl"))
 include(joinpath(dirname(pathof(CedarSim)), "spc/interface.jl"))
 include(joinpath(dirname(pathof(CedarSim)), "spc/sema.jl"))
 include(joinpath(dirname(pathof(CedarSim)), "spc/codegen.jl"))
 include(joinpath(dirname(pathof(CedarSim)), "spc/query.jl"))
 include(joinpath(dirname(pathof(CedarSim)), "spc/generated.jl"))
 
-#=
 ckt = sp"""
     * Inverter test
 
@@ -46,8 +46,6 @@ ckt = sp"""
     .TRAN 1e-9 4.0e-7
     .END
     """
-=#
-
 #=
 ckt = sp"""
 * Sky130 test
@@ -60,9 +58,7 @@ Vg VG 0 sin(0.9 0.9 1e3)
 
 .lib jlpkg://Sky130PDK/sky130A/libs.tech/ngspice/sky130.lib.spice tt
 """
-=#
 
-#=
 ckt = sp"""
 * Subcircuit hierarchy test
 .param area=10
@@ -80,8 +76,6 @@ x1 1 2 hier2 area='area'
 x0 1 0 hier1 w=10 l=3
 i1 1 0 1
 """
-=#
-
 ckt = sp"""
 * Inverter Smoke test
 
@@ -103,10 +97,10 @@ VD D 0 PWL(
 + )
 
 *.hdl "jlpkg://CMC/cmc_models/PSP103.8.2/psp103_nqs.va"
-.hdl "/home/keno/.julia/packages/CMC/gDuGv/cmc_models/PSP103.8.2/psp103_nqs.va"
 .LIB "jlpkg://IHP_SG13G2/models/cornerMOSlv.lib" mos_tt
 .END
 """
+=#
 
 display(ckt)
 ckt()

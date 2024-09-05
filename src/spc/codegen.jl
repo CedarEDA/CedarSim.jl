@@ -445,7 +445,6 @@ function codegen!(state::CodegenState)
         push!(block.args, LineNumberNode(instance))
         push!(block.args, cg_instance!(state::CodegenState, instance))
     end
-    @show ret
     return ret
 end
 

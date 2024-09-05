@@ -2,7 +2,7 @@
 
 julia_version = "1.12.0-DEV"
 manifest_format = "2.0"
-project_hash = "811b31022f66eb2395a7f0f9a1724d2a1a78c000"
+project_hash = "dd389c757edb3b7738db3d38b2e835a8b399760d"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "6778bcc27496dae5723ff37ee30af451db8b35fe"
@@ -1144,7 +1144,6 @@ version = "0.3.23"
 
 [[deps.IHP_SG13G2]]
 deps = ["CMC", "CedarSim", "DAECompiler", "SciMLBase", "SciMLSensitivity", "SpectreNetlistParser"]
-entryfile = "libs.tech/cedar/src/IHP_SG13G2.jl"
 path = "/home/keno/IHP-Open-PDK/ihp-sg13g2/"
 uuid = "c3c42918-95e2-40b6-9b53-bff061a12edb"
 version = "0.0.0"

@@ -22,6 +22,7 @@ using Combinatorics
 using ForwardDiff
 using ForwardDiff: Dual
 using DAECompiler
+using OrderedCollections
 
 const VAT = VerilogAParser.VerilogATokenize
 
@@ -52,12 +53,14 @@ struct Scope
     ninternal_nodes::Int
     branch_order::Vector{Pair{Symbol}}
     used_branches::Set{Pair{Symbol}}
+    named_branches::OrderedDict{Symbol, Pair{Symbol, Symbol}}
     var_types::Dict{Symbol, Union{Type{Int}, Type{Float64}}}
     all_functions::Dict{Symbol, VAFunction}
     undefault_ids::Bool
     ddx_order::Vector{Symbol}
 end
 Scope() = Scope(Set{Symbol}(), Vector{Symbol}(), 0, Vector{Pair{Symbol}}(), Set{Pair{Symbol}}(),
+    OrderedDict{Symbol, Pair{Symbol, Symbol}}(),
     Dict{Symbol, Union{Type{Int}, Type{Float64}}}(), Dict{Symbol, VAFunction}(),
     false, Vector{Symbol}())
 
@@ -143,9 +146,15 @@ function (to_julia::Scope)(cs::VANode{ContributionStatement})
 
     if length(refs) == 1
         node = refs[1]
-        svar = Symbol("branch_state_", node, "_0")
-        eqvar = Symbol("branch_value_", node, "_0")
-        push!(to_julia.used_branches, node => Symbol("0"))
+        named_branch = get(to_julia.named_branches, node, nothing)
+        if named_branch !== nothing
+            branch_name = node
+        else
+            branch_name = make_unnamed_branch_name(node, Symbol("0"))
+            push!(to_julia.used_branches, node => Symbol("0"))
+        end
+        svar = Symbol("branch_state_", branch_name)
+        eqvar = Symbol("branch_value_", branch_name)
         return quote
             if $svar != $kind
                 $eqvar = 0.0
@@ -166,8 +175,9 @@ function (to_julia::Scope)(cs::VANode{ContributionStatement})
 
         s = gensym()
 
-        svar = Symbol("branch_state_", branch[1], "_", branch[2])
-        eqvar = Symbol("branch_value_", branch[1], "_", branch[2])
+        branch_name = make_unnamed_branch_name(branch...)
+        svar = Symbol("branch_state_", branch_name)
+        eqvar = Symbol("branch_value_", branch_name)
         return @nolines quote
             if $svar != $kind
                 $eqvar = 0.0
@@ -252,7 +262,7 @@ function (to_julia::Scope)(asb::VANode{AnalogSeqBlock})
 
         to_julia_block = Scope(to_julia.parameters,
             to_julia.node_order, to_julia.ninternal_nodes, to_julia.branch_order,
-            to_julia.used_branches, block_var_types, to_julia.all_functions,
+            to_julia.used_branches, to_julia.named_branches, block_var_types, to_julia.all_functions,
             to_julia.undefault_ids, to_julia.ddx_order)
     else
         to_julia_block = to_julia
@@ -364,8 +374,18 @@ function (to_julia::Scope)(stmt::VANode{FunctionCall})
         id2 = length(stmt.args) > 1 ? Symbol(stmt.args[2].item) : nothing
 
         if id2 === nothing
-            push!(to_julia.used_branches, id1 => Symbol("0"))
-            return Vref(id1)
+            named_branch = get(to_julia.named_branches, id1, nothing)
+            if named_branch !== nothing
+                (a, b) = named_branch
+                if b == :var"0"
+                    return :($(Vref(a)))
+                else
+                    return :($(Vref(a)) - $(Vref(b)))
+                end
+            else
+                push!(to_julia.used_branches, id1 => Symbol("0"))
+                return Vref(id1)
+            end
         else
             idx = findfirst(to_julia.branch_order) do branch
                 branch == (id1 => id2) || branch == (id2 => id1)
@@ -381,8 +401,14 @@ function (to_julia::Scope)(stmt::VANode{FunctionCall})
         id2 = length(stmt.args) > 1 ? Symbol(stmt.args[2].item) : nothing
 
         if id2 == nothing
-            push!(to_julia.used_branches, id1 => Symbol("0"))
             reversed = false
+            named_branch = get(to_julia.named_branches, id1, nothing)
+            if named_branch !== nothing
+                branch_name = id1
+            else
+                branch_name = make_unnamed_branch_name(id1, Symbol("0"))
+                push!(to_julia.used_branches, id1 => Symbol("0"))
+            end
         else
             idx = findfirst(to_julia.branch_order) do branch
                 branch == (id1 => id2) || branch == (id2 => id1)
@@ -392,8 +418,9 @@ function (to_julia::Scope)(stmt::VANode{FunctionCall})
             branch = to_julia.branch_order[idx]
             reversed = branch == (id2 => id1)
             push!(to_julia.used_branches, branch)
+            branch_name = make_unnamed_branch_name(branch...)
         end
-        ex = :(error("TODO"))
+        ex = Symbol("I($branch_name)")
         reversed && (ex = :(-$ex))
         return ex
     elseif fname == :ddx
@@ -416,6 +443,17 @@ function (to_julia::Scope)(stmt::VANode{FunctionCall})
                         dx2 = $(isa)(x, $(Dual)) ? (@inbounds $(ForwardDiff.partials)($(SimTag), x, $id2_idx)) : 0.0
                 (dx1-dx2)/2
             end)
+        end
+    elseif fname == :idt
+        if length(stmt.args) != 1
+            # TODO: Needs additional DAECompiler support: https://github.com/CedarEDA/DAECompiler.jl/issues/7
+        end
+        expr = to_julia(stmt.args[1].item)
+        s = gensym()
+        return quote
+            $s = $(DAECompiler.variable)()
+            $(DAECompiler.equation!)($(DAECompiler.ddt)($s) - $expr)
+            $s
         end
     elseif fname ∈ (:white_noise, :flicker_noise)
         args = map(x->to_julia(x.item), stmt.args)
@@ -549,8 +587,8 @@ function (to_julia::Scope)(fd::VANode{AnalogFunctionDeclaration})
     end
 
     to_julia_internal = Scope(to_julia.parameters, to_julia.node_order,
-        to_julia.ninternal_nodes, to_julia.branch_order, to_julia.used_branches, var_types,
-        to_julia.all_functions, to_julia.undefault_ids, to_julia.ddx_order)
+        to_julia.ninternal_nodes, to_julia.branch_order, to_julia.used_branches,
+        to_julia.named_branches, var_types, to_julia.all_functions, to_julia.undefault_ids, to_julia.ddx_order)
 
     validate_parameters(var_types, inout_decls)
     out_args = [k for k in arg_order if inout_decls[k] in (:output, :inout)]
@@ -664,6 +702,8 @@ function find_ddx!(ddx_order::Vector{Symbol}, va::VANode)
     end
 end
 
+make_unnamed_branch_name(a, b) = string("#",a,"_",b)
+
 function make_spice_device(vm::VANode{VerilogModule})
     ps = pins(vm)
     modname = String(vm.id)
@@ -680,13 +720,14 @@ function make_spice_device(vm::VANode{VerilogModule})
     find_ddx!(to_julia_global.ddx_order, vm)
     to_julia_defaults = Scope(to_julia_global.parameters,
     to_julia_global.node_order, to_julia_global.ninternal_nodes,
-        to_julia_global.branch_order, to_julia_global.used_branches,
+        to_julia_global.branch_order, to_julia_global.used_branches, to_julia_global.named_branches,
         to_julia_global.var_types, to_julia_global.all_functions,
         true, to_julia_global.ddx_order)
     internal_nodes = Vector{Symbol}()
     var_types = Dict{Symbol, Union{Type{Int}, Type{Float64}}}()
     aliases = Dict{Symbol, Symbol}()
     observables = Dict{Symbol, Symbol}()
+    named_branches = OrderedDict{Symbol, Pair{Symbol, Symbol}}()
 
     # First to a pre-pass to figure out the scope context
     for child in vm.items
@@ -701,6 +742,20 @@ function make_spice_device(vm::VANode{VerilogModule})
                         # Internal node
                         push!(internal_nodes, id)
                     end
+                end
+            end
+            BranchDeclaration => begin
+                a = Symbol(item.references[1])
+                if length(item.references) == 1
+                    b = :var"0"
+                else
+                    b = Symbol(item.references[2])
+                end
+                for id in item.ids
+                    if haskey(named_branches, Symbol(id.item.id))
+                        cedarerror("Duplicate branch declaration")
+                    end
+                    named_branches[Symbol(id.item.id)] = a=>b
                 end
             end
             ParameterDeclaration => begin
@@ -761,11 +816,12 @@ function make_spice_device(vm::VANode{VerilogModule})
     node_order = [ps; internal_nodes; Symbol("0")]
     to_julia = Scope(parameter_names,  node_order, length(internal_nodes),
         collect(map(x->Pair(x...), combinations(node_order, 2))),
-        Set{Pair{Symbol}}(),
+        Set{Pair{Symbol}}(), named_branches,
         var_types,
         Dict{Symbol, VAFunction}(), false,
         to_julia_global.ddx_order)
     lno = nothing
+
     for child in vm.items
         item = child.item
         @case formof(item) begin
@@ -773,7 +829,7 @@ function make_spice_device(vm::VANode{VerilogModule})
             InOutDeclaration => nothing
             IntRealDeclaration => nothing
             NetDeclaration => nothing # Handled above
-            BranchDeclaration => nothing
+            BranchDeclaration => nothing # Handled above
             ParameterDeclaration => nothing # Handled above
             AliasParameterDeclaration => nothing # Handled above
             AnalogFunctionDeclaration => begin
@@ -793,17 +849,23 @@ function make_spice_device(vm::VANode{VerilogModule})
         end
     end
 
-    all_branch_order = filter(branch->branch in to_julia.used_branches, to_julia.branch_order)
-    branch_state = map(all_branch_order) do (a, b)
-        svar = Symbol("branch_state_", a, "_", b)
-        eqvar = Symbol("branch_value_", a, "_", b)
+    # Unnamed branches
+    all_branch_order = Pair{Symbol, Pair{Symbol, Symbol}}[Symbol(make_unnamed_branch_name(branch...))=>(branch[1]=>branch[2]) for branch in to_julia.branch_order if branch in to_julia.used_branches]
+
+    # Add the named branches
+    append!(all_branch_order, to_julia.named_branches)
+
+    # Generated code for all branches
+    branch_state = map(all_branch_order) do (branch_name, _)
+        svar = Symbol("branch_state_", branch_name)
+        eqvar = Symbol("branch_value_", branch_name)
         @nolines quote
             $svar = $(CURRENT)
             $eqvar = 0.0
         end
     end
 
-    internal_currents = Any[(Symbol("I($a, $b)") for (a, b) in all_branch_order)...]
+    internal_currents = Any[(Symbol("I($branch_name)") for (branch_name, _) in all_branch_order)...]
 
     internal_currents_def = Expr(:block,
         (@nolines quote
@@ -812,7 +874,7 @@ function make_spice_device(vm::VANode{VerilogModule})
     )
 
     function current_sum(node)
-        Expr(:call, +, map(Iterators.filter(branch->node in branch[2], enumerate(all_branch_order))) do (n, (a,b))
+        Expr(:call, +, map(Iterators.filter(((_, (_, branch_nodes)),)->node in branch_nodes, enumerate(all_branch_order))) do (n, (_, (a,b)))
             ex = internal_currents[n]
             # Positive currents flow out of devices, into nodes, so I(a, b)'s contribution to the a KCL
             # is -I(a, b).
@@ -825,15 +887,15 @@ function make_spice_device(vm::VANode{VerilogModule})
             $DScope(dscope, $(QuoteNode(Symbol("KCL($node)"))))))
     end
 
-    internal_eqs = map(enumerate(all_branch_order)) do (n, (a,b))
-        svar = Symbol("branch_state_", a, "_", b)
-        eqvar = Symbol("branch_value_", a, "_", b)
+    internal_eqs = map(enumerate(all_branch_order)) do (n, (branch_name, (a,b)))
+        svar = Symbol("branch_state_", branch_name)
+        eqvar = Symbol("branch_value_", branch_name)
         if b == Symbol("0")
             @nolines :($(DAECompiler.equation!)($svar == $(CURRENT) ? $(internal_currents[n]) - $eqvar : $a - $eqvar,
-                $DScope(dscope, $(QuoteNode(Symbol("Branch($a)"))))))
+                $DScope(dscope, $(QuoteNode(Symbol("Branch($branch_name)"))))))
         else
             @nolines :($(DAECompiler.equation!)($svar == $(CURRENT) ? $(internal_currents[n]) - $eqvar : ($a - $b) - $eqvar,
-                $DScope(dscope, $(QuoteNode(Symbol("Branch($a, $b)"))))))
+                $DScope(dscope, $(QuoteNode(Symbol("Branch($branch_name)"))))))
         end
     end
 
