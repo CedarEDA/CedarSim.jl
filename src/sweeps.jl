@@ -455,6 +455,8 @@ function tran!(circ, tspan, du=nothing, u=nothing; debug_config = (;), kwargs...
 end
 tran!(prob::DAEProblem; kwargs...) = solve(prob, IDA(); kwargs...)
 tran!(cs::CircuitSweep; kwargs...) = tran!.(cs.sys, cs; kwargs...)
+
+#=
 function tran!(circ::ParsedCircuit, tspan=find_default_tspan(circ); debug_config=(;), kwargs...)
     sim = CedarSim.DefaultSim(circ)
     sys = CircuitIRODESystem(circ; debug_config)
@@ -463,6 +465,7 @@ function tran!(circ::ParsedCircuit, tspan=find_default_tspan(circ); debug_config
 end
 
 DiffEqBase.solve(ps::ParsedCircuit) = tran!(ps)
+=#
 
 # Helper function of `first()` that passes through `nothing`
 first_or_nothing(x) = first(x)

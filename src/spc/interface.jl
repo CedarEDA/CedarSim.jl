@@ -49,7 +49,7 @@ function analyze_mosfet_import(dialect, level)
 end
 
 function analyze_imports!(n::SNode, parse_cache::Union{CedarParseCache, Nothing}, traverse_imports::Bool=false;
-        imports=Set{String}(),
+        imports=Set{Symbol}(),
         hdl_imports=Set{String}(),
         includes::Set{String}=Set{String}(),
         pkg_hdl_imports=Set{String}(),
@@ -61,7 +61,7 @@ function analyze_imports!(n::SNode, parse_cache::Union{CedarParseCache, Nothing}
             if startswith(str, JLPATH_PREFIX)
                 path = str[sizeof(JLPATH_PREFIX)+1:end]
                 components = splitpath(path)
-                push!(imports, components[1])
+                push!(imports, Symbol(components[1]))
                 if isa(stmt, SNode{SP.HDLStatement})
                     push!(pkg_hdl_imports, str)
                 else
@@ -75,6 +75,8 @@ function analyze_imports!(n::SNode, parse_cache::Union{CedarParseCache, Nothing}
                     if isa(stmt, SNode{SP.HDLStatement})
                         parse_and_cache_va!(parse_cache, str)
                     else
+                        str in includes && continue
+                        push!(includes, str)
                         analyze_imports!(parse_and_cache_spc!(parse_cache, str), parse_cache; imports, hdl_imports, includes, thispath=str)
                     end
                 else
@@ -209,11 +211,11 @@ macro sp_str(str, flag="")
         push!(t.args, :(import $imp as $s))
         push!(kws, Expr(:kw, imp, s))
     end
-    push!(t.args, quote
-        imps=(;$(kws...))
-        codegen_missing_imports!($(__module__), imps, $(pkg_hdl_imports), $(pkg_spc_import))
-        s = $(sema)($sa; imps, parse_cache=var"#cedar_parse_cache#")
-        eval(sema_assign_ids(s))
-    end)
+    push!(t.args, esc(quote
+        let imps=(;$(kws...))
+            $(codegen_missing_imports!)($(__module__), imps, $(pkg_hdl_imports), $(pkg_spc_import))
+            eval($(sema_assign_ids)($(sema)($sa; imps, parse_cache=var"#cedar_parse_cache#")))
+        end
+    end))
     return t
 end

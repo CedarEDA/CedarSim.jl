@@ -1,6 +1,6 @@
 name = "CedarSim"
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
-version = "0.12.0"
+version = "0.11.4"
 authors = ["JuliaHub, Inc. and other contributors"]
 
 [workspace]
@@ -12,7 +12,6 @@ AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 AxisKeys = "94b1ba4f-4ee9-5380-92f1-94cde586c3c5"
-CMC = "db13d295-e716-48aa-bdca-f6cce3d4ecc6"
 CassetteOverlay = "d78b62d4-37fa-4a6f-acd8-2f19986eb9ee"
 ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
@@ -74,7 +73,6 @@ CedarSimReviseExt = "Revise"
 [compat]
 AbstractAlgebra = "≥ 0.31.1"
 AbstractTrees = "≥ 0.4.1"
-CMC = "0.3.0"
 CSV = "≥ 0.10.14"
 CassetteOverlay = "≥ 0.1.8"
 ChainRulesCore = "1.18.0"

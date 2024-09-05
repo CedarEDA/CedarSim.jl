@@ -2,7 +2,7 @@
 
 julia_version = "1.12.0-DEV"
 manifest_format = "2.0"
-project_hash = "dd389c757edb3b7738db3d38b2e835a8b399760d"
+project_hash = "5f6d92690e236007cfedb5463fff261add26b2b4"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "6778bcc27496dae5723ff37ee30af451db8b35fe"
@@ -325,10 +325,10 @@ uuid = "d78b62d4-37fa-4a6f-acd8-2f19986eb9ee"
 version = "0.2.1"
 
 [[deps.CedarSim]]
-deps = ["ADTypes", "AbstractAlgebra", "AbstractTrees", "Accessors", "AxisKeys", "CassetteOverlay", "ChainRules", "ChainRulesCore", "Combinatorics", "Compat", "DAECompiler", "DecFP", "DescriptorSystems", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DynamicScope", "ExprTools", "ForwardDiff", "Graphs", "IHP_SG13G2", "Lexers", "LinearAlgebra", "LinearSolve", "Logging", "NLsolve", "NaNMath", "NonlinearSolve", "OrderedCollections", "OrdinaryDiffEq", "PrecompileTools", "Random", "SciMLBase", "SciMLNLSolve", "SciMLSensitivity", "Scratch", "SpectreNetlistParser", "StateSelection", "StaticArrays", "StructArrays", "Sundials", "SymbolicIndexingInterface", "VT100", "VectorPrisms", "VerilogAParser"]
+deps = ["ADTypes", "AbstractAlgebra", "AbstractTrees", "Accessors", "AxisKeys", "CassetteOverlay", "ChainRules", "ChainRulesCore", "Combinatorics", "Compat", "DAECompiler", "DecFP", "DescriptorSystems", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DynamicScope", "ExprTools", "ForwardDiff", "Graphs", "Lexers", "LinearAlgebra", "LinearSolve", "Logging", "NLsolve", "NaNMath", "NonlinearSolve", "OrderedCollections", "OrdinaryDiffEq", "PrecompileTools", "Random", "SciMLBase", "SciMLNLSolve", "SciMLSensitivity", "Scratch", "SpectreNetlistParser", "StateSelection", "StaticArrays", "StructArrays", "Sundials", "SymbolicIndexingInterface", "VT100", "VectorPrisms", "VerilogAParser"]
 path = "."
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
-version = "0.12.0"
+version = "0.11.4"
 
     [deps.CedarSim.extensions]
     CedarSimCSVExt = "CSV"
@@ -1144,6 +1144,7 @@ version = "0.3.23"
 
 [[deps.IHP_SG13G2]]
 deps = ["CMC", "CedarSim", "DAECompiler", "SciMLBase", "SciMLSensitivity", "SpectreNetlistParser"]
+entryfile = "libs.tech/cedar/src/IHP_SG13G2.jl"
 path = "/home/keno/IHP-Open-PDK/ihp-sg13g2/"
 uuid = "c3c42918-95e2-40b6-9b53-bff061a12edb"
 version = "0.0.0"

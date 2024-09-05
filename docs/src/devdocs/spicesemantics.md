@@ -16,6 +16,31 @@ This reflects our best understanding of what ngspice's evaluation semantics are 
 - For subcircuits, parameters that are not defined within the subcircuit are looked up in the *instantiating* scope (N.B.:,
   not the lexically enclosing scope)
 
+## Parameters are evaluated in callee scope with the exception of itself
+The following uses the outer parameter:
+```
+* Self-assignment test
+.subckt test 1 2
+.param x=x
+R 1 2 {x}
+.ends
+.param x=1
+V1 1 0 1
+X1 1 0 test
+```
+
+While this is an error:
+```
+* Self-assignment test
+.subckt test 1 2
+.param x=y y=x
+R 1 2 {x}
+.ends
+.param x=1
+V1 1 0 1
+X1 1 0 test
+```
+
 ## Caller arguments are evaluated in callee scope
 Consider the following:
 

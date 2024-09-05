@@ -1,6 +1,5 @@
 using OrderedCollections
 using Graphs
-using GF180MCUPDK
 using VerilogAParser
 
 const JLPATH_PREFIX = "jlpkg://"
@@ -191,7 +190,7 @@ function sema_resolve_import(scope::SemaResult, imp::Symbol)
     return imp_mod
 end
 
-function spice_select_device(sema::SemaResult, devkind, level, version, stmt; dialect=:ngspice)
+function spice_select_device(sema::SemaResult, devkind::Symbol, level, version, stmt; dialect=:ngspice)
     if devkind == :d
         return GlobalRef(CedarSim.SpectreEnvironment, :diode)
     elseif devkind == :r
@@ -202,11 +201,15 @@ function spice_select_device(sema::SemaResult, devkind, level, version, stmt; di
     if dialect == :ngspice
         if devkind in (:pmos, :nmos)
             if level == 5
-                #error("bsim2 not supported")
-                #return :bsim2
+                file = stmt.ps.srcfile.path
+                line = SpectreNetlistParser.LineNumbers.compute_line(stmt.ps.srcfile.lineinfo, stmt.startof)
+                @warn "BSIM2 ($devkind at level $level) not implemented" _file=file _line=line
+                return GlobalRef(CedarSim, :UnimplementedDevice)
             elseif level == 8 || level == 49
-                #error("bsim3 not supported")
-                #return :bsim3
+                file = stmt.ps.srcfile.path
+                line = SpectreNetlistParser.LineNumbers.compute_line(stmt.ps.srcfile.lineinfo, stmt.startof)
+                @warn "BSIM3 ($devkind at level $level) not implemented" _file=file _line=line
+                return GlobalRef(CedarSim, :UnimplementedDevice)
             elseif level == 14 || level == 54
                 return GlobalRef(sema_resolve_import(sema, :BSIM4), :bsim4)
             elseif level == 17 || level == 72
@@ -224,6 +227,11 @@ function spice_select_device(sema::SemaResult, devkind, level, version, stmt; di
                 @warn "Mosfet $devkind at level $level not implemented" _file=file _line=line
                 return GlobalRef(CedarSim, :UnimplementedDevice)
             end
+        elseif devkind in (:pnp, :npn)
+            file = stmt.ps.srcfile.path
+            line = SpectreNetlistParser.LineNumbers.compute_line(stmt.ps.srcfile.lineinfo, stmt.startof)
+            @warn "Bipolar $devkind at level $level not implemented" _file=file _line=line
+            return GlobalRef(CedarSim, :UnimplementedDevice)
         elseif devkind == :sw
             return GlobalRef(CedarSim.SpectreEnvironment, :Switch)
         end
@@ -538,12 +546,20 @@ function resolve_scopes!(sr::SemaResult)
         sema_visit_ids!(def[2].val.val) do name
             push!(sr.exposed_parameters, name)
             if haskey(idx_lookup, name)
-                add_edge!(graph, idx_lookup[name], n)
+                m = idx_lookup[name]
+                if m != n
+                    # Self-parameter reference refers to outer scope
+                    add_edge!(graph, idx_lookup[name], n)
+                end
             end
         end
     end
 
-    sr.parameter_order = topological_sort(graph)
+    try
+        sr.parameter_order = topological_sort(graph)
+    catch
+        @show strongly_connected_components(graph)
+    end
 
     # Figure out which of the parameters we have seen do not have a local
     # definition.
@@ -602,7 +618,7 @@ function sema_assign_ids(r::SemaResult)
         $(assign_id!)($r, $s)
         (::$(typeof(getsema)))(::Type{$s}) = $r
         $(subs.args...)
-        SpCircuit{$s, Tuple{}}((;), (;))
+        $(SpCircuit){$s, Tuple{}}((;), (;))
     end
 end
 

@@ -12,6 +12,13 @@ LString(s::AbstractString) = lowercase(s)
 LString(s::Symbol) = lowercase(String(s))
 LSymbol(s) = Symbol(LString(s))
 
+function Base.LineNumberNode(n::SNode)
+    sf = n.ps.srcfile
+    lsf = sf.lineinfo
+    lno_first = SpectreNetlistParser.LineNumbers.compute_line(lsf, n.startof+n.expr.off)
+    LineNumberNode(lno_first, Symbol(sf.path))
+end
+
 function hasparam(params, name)
     for p in params
         if LString(p.name) == name
@@ -216,7 +223,7 @@ function cg_spice_instance!(state::CodegenState, ports, name, model, param_exprs
     port_exprs = map(ports) do port
         cg_net_name!(state, port)
     end
-    :($(Named)($model(; $(param_exprs...)), $(LString(name)))($(port_exprs...)))
+    :($(Named)($(spicecall)($model; $(param_exprs...)), $(LString(name)))($(port_exprs...)))
 end
 
 function cg_instance!(state::CodegenState, instance::SNode{SP.SubcktCall})
@@ -373,7 +380,33 @@ function cg_model_def!(state::CodegenState, (model, modelref)::Pair{<:SNode, Glo
     end
 
     lhs = Symbol(LString(model.name))
-    return :($(CedarSim.spicecall)($(CedarSim.ParsedModel), $modelref, (;$(params...))))
+
+    @assert isdefined(modelref.mod, modelref.name)
+    T = getglobal(modelref.mod, modelref.name)
+
+    # Peek at the fieldnames of the model to find the correct case for all params.
+    # This obviates the need for using `spicecall`, saving us a bunch of compilation work.
+    # Essentially, we're inlining the generator for case_adjust_kwargs
+    case_insensitive = Dict(Symbol(lowercase(String(kw))) => kw for kw in fieldnames(T))
+    for i = 1:length(params)
+        name = params[i].args[1]
+        lname = Symbol(lowercase(String(name)))
+        rname = get(case_insensitive, lname, nothing)
+        if rname === nothing
+            if lname in (:lmin, :lmax, :wmin, :wmax)
+                # These are magic parameters for model binning. Treat them as
+                # uppercase always.
+                rname = Symbol(uppercase(String(name)))
+            else
+                rname = name
+            end
+        end
+        params[i] = Expr(:kw,
+            rname,
+            params[i].args[2])
+    end
+
+    return :($(ParsedModel{T})(($modelref)(; $(params...))))
 end
 
 function codegen!(state::CodegenState)

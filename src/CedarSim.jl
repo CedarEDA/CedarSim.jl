@@ -7,7 +7,6 @@ using Base: @with, with
 
 # re-exports
 export DAEProblem
-export @dyn, @requires, @provides, @isckt_or
 export solve
 
 
@@ -26,10 +25,12 @@ include("ModelLoader.jl")
 include("aliasextract.jl")
 include("netlist_utils.jl")
 include("deprecated.jl")
-include("circsummary.jl")
+#include("circsummary.jl")
 
 import .ModelLoader: load_VA_model
 export load_VA_model
+
+export @sp_str
 
 # Store the known-good julia version that we should be compiling against
 _blessed_julia_version = begin
@@ -54,6 +55,7 @@ function __init__()
     check_version_match()
 end
 
+#=
 using PrecompileTools
 @setup_workload let
     spice = """
@@ -77,6 +79,7 @@ using PrecompileTools
         code3 = CedarSim.make_spectre_circuit(sa3)
     end
 end
+=#
 
 "
     @declare_MSLConnector(mtk_model, pin_ports...)
@@ -89,7 +92,7 @@ end
 Defined the functions needed to connect a MTK based model (defined using MSL `Pin`s) to Cedar.
 As input provide the model (an `ODESystem`), and a list of pins defined using `ModelingToolkitStandardLibary.Electrical.Pin`s.
 These pins can be as direct components of the model or subcomponents other components.
-When you use this component as a subcircuit (as shown in the example) they be connected to CedarSim `AbstractNets` 
+When you use this component as a subcircuit (as shown in the example) they be connected to CedarSim `AbstractNets`
 corresponding to the SPICE nodes, in the order you list them.
 
 

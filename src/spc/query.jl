@@ -26,7 +26,7 @@ end
     Model
     Subckt
     Instance
-    Net
+    SPNet
     Ambiguous
 end
 
@@ -67,7 +67,7 @@ function Base.show(io::IO, ::MIME"text/plain", ref::SpRef)
         print(io, "Subckt")
     elseif ref.kind == Instance
         print(io, "Instance")
-    elseif ref.kind == Net
+    elseif ref.kind == SPNet
         print(io, "Net")
     end
     print(io, " ")
