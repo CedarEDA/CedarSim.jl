@@ -2,7 +2,7 @@
 
 julia_version = "1.12.0-DEV"
 manifest_format = "2.0"
-project_hash = "6c7504fe7acf394650b1277bc3e2f05c5d7da25f"
+project_hash = "5f6d92690e236007cfedb5463fff261add26b2b4"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "6778bcc27496dae5723ff37ee30af451db8b35fe"
@@ -255,7 +255,9 @@ version = "0.5.0"
 
 [[deps.CMC]]
 deps = ["CedarSim"]
-git-tree-sha1 = "314d5b421e5442034f61bf0eea8f8ca2ea1d75d2"
+git-tree-sha1 = "1faf28f97318e59ecec31bfb66e6d746890816e2"
+repo-rev = "main"
+repo-url = "https://github.com/CedarEDA/CMC.jl.git"
 uuid = "db13d295-e716-48aa-bdca-f6cce3d4ecc6"
 version = "0.3.0"
 
@@ -323,7 +325,7 @@ uuid = "d78b62d4-37fa-4a6f-acd8-2f19986eb9ee"
 version = "0.2.1"
 
 [[deps.CedarSim]]
-deps = ["ADTypes", "AbstractAlgebra", "AbstractTrees", "Accessors", "AxisKeys", "CassetteOverlay", "ChainRules", "ChainRulesCore", "Combinatorics", "Compat", "DAECompiler", "DecFP", "DescriptorSystems", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DynamicScope", "ExprTools", "ForwardDiff", "Lexers", "LinearAlgebra", "LinearSolve", "Logging", "NLsolve", "NaNMath", "NonlinearSolve", "OrderedCollections", "OrdinaryDiffEq", "PrecompileTools", "Random", "SciMLBase", "SciMLNLSolve", "SciMLSensitivity", "Scratch", "SpectreNetlistParser", "StateSelection", "StaticArrays", "StructArrays", "Sundials", "SymbolicIndexingInterface", "VT100", "VectorPrisms", "VerilogAParser"]
+deps = ["ADTypes", "AbstractAlgebra", "AbstractTrees", "Accessors", "AxisKeys", "CassetteOverlay", "ChainRules", "ChainRulesCore", "Combinatorics", "Compat", "DAECompiler", "DecFP", "DescriptorSystems", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DynamicScope", "ExprTools", "ForwardDiff", "Graphs", "Lexers", "LinearAlgebra", "LinearSolve", "Logging", "NLsolve", "NaNMath", "NonlinearSolve", "OrderedCollections", "OrdinaryDiffEq", "PrecompileTools", "Random", "SciMLBase", "SciMLNLSolve", "SciMLSensitivity", "Scratch", "SpectreNetlistParser", "StateSelection", "StaticArrays", "StructArrays", "Sundials", "SymbolicIndexingInterface", "VT100", "VectorPrisms", "VerilogAParser"]
 path = "."
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
 version = "0.11.4"
@@ -1030,9 +1032,9 @@ version = "1.11.0"
 
 [[deps.GF180MCUPDK]]
 deps = ["BSIM4", "CedarSim", "PrecompileTools"]
-git-tree-sha1 = "50b44503e3daf720b64e69bfdd5133bf07817256"
+path = "/home/keno/.julia/dev/GF180MCUPDK"
 uuid = "4c528db8-839e-4d0b-8de9-a61e03c09612"
-version = "0.4.0"
+version = "0.3.0"
 
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
@@ -1139,6 +1141,13 @@ deps = ["DualNumbers", "LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
 git-tree-sha1 = "f218fe3736ddf977e0e772bc9a586b2383da2685"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.23"
+
+[[deps.IHP_SG13G2]]
+deps = ["CMC", "CedarSim", "DAECompiler", "SciMLBase", "SciMLSensitivity", "SpectreNetlistParser"]
+entryfile = "libs.tech/cedar/src/IHP_SG13G2.jl"
+path = "/home/keno/IHP-Open-PDK/ihp-sg13g2/"
+uuid = "c3c42918-95e2-40b6-9b53-bff061a12edb"
+version = "0.0.0"
 
 [[deps.IOCapture]]
 deps = ["Logging", "Random"]
@@ -2482,7 +2491,7 @@ version = "0.1.3"
 
 [[deps.Sky130PDK]]
 deps = ["BSIM4", "CedarSim", "PrecompileTools"]
-git-tree-sha1 = "bea964707e4b60323a9a43594eec7947133b9200"
+path = "/home/keno/.julia/dev/Sky130PDK"
 uuid = "3a9dc963-4db1-4336-a55a-41e26ba2a676"
 version = "0.5.0"
 

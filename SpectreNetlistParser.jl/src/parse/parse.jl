@@ -271,8 +271,6 @@ function parse_nodeset(ps)
     return EXPR(NodeSet(kw, parameters, nl))
 end
 
-
-
 function parse_altergroup(ps, name)
     kw = accept_kw(ps, ALTERGROUP)
     lbrace = accept(ps, LBRACE)

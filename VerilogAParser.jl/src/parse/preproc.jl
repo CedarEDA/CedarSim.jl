@@ -92,6 +92,7 @@ mutable struct ParseState{L<:Lexer}
     search_path::Vector{String}
     macros::Dict{Symbol, MacroDef}
     macrostack::Vector{Pair{Tuple{UInt32, UInt32}, MacroScope}}
+    macro_arg_expansion_depth::Int
     macroerr::Union{Nothing, MacroErrorScope}
     ifdef_depth::Int
     done::Bool # Remove this
@@ -316,7 +317,7 @@ function ParseState(str::Union{IOBuffer,String}, fname::Union{String, Nothing} =
     macros = Dict{Symbol, MacroDef}()
     l = tokenize(str, ERROR, next_token)
     ps = ParseState{typeof(l)}(SrcFile[SrcFile(fname, str)], [(1,UInt32(0),l)], String[artifact"vams"], macros,
-        Vector{MacroScope}(), nothing, 0,
+        Vector{MacroScope}(), 0, nothing, 0,
         false, Token(ERROR),
         Token(ERROR), ntuple(_->Token(ERROR), PARSER_LOOKAHEAD+PREPROC_LOOKAHEAD-1), Token(ERROR),
         (uz, uz), ntuple(_->(uz, uz), PARSER_LOOKAHEAD+PREPROC_LOOKAHEAD-1), (uz, uz), uz,
@@ -442,19 +443,9 @@ function get_next_token(ps, account = true)
         if isempty(ps.macroerr.toks)
             ps.macroerr = nothing
         end
-        if kind(tok) != ENDMARKER && account
-            toklen = tok.endbyte - tok.startbyte + 1
-            ps.allvirtpos += toklen
-        end
-        return tok
     elseif isempty(ps.macrostack)
         lex = active_lexer(ps)
         tok = next_token(lex)
-        if kind(tok) != ENDMARKER && account
-            toklen = tok.endbyte - tok.startbyte + 1
-            ps.allvirtpos += toklen
-        end
-        return tok
     else
         scope = ps.macrostack[end][2]
         def = scope.def
@@ -471,17 +462,25 @@ function get_next_token(ps, account = true)
                             expanded_range,
                             popped[2].def,
                             popped[2].offsets)))
+            ps.macro_arg_expansion_depth = length(ps.macrostack)
+            if !isempty(ps.macrostack) && ps.macrostack[end][2].def.is_formal_arg
+                matching = 0
+                while matching > 0 || (ps.macro_arg_expansion_depth != 0 && ps.macrostack[ps.macro_arg_expansion_depth][2].def.is_formal_arg)
+                    matching -= (ps.macrostack[ps.macro_arg_expansion_depth][2].def.is_formal_arg ? -1 : 1)
+                    ps.macro_arg_expansion_depth -= 1
+                end
+            end
             return get_next_token(ps)
         end
         tok = def.tokens[scope.idx]
         ps.macrostack[end] = ps.macrostack[end][1] =>
             MacroScope(def, scope.actual_args, scope.offsets, scope.idx + 1)
-        if kind(tok) != ENDMARKER && account
-            toklen = tok.endbyte - tok.startbyte + 1
-            ps.allvirtpos += toklen
-        end
-        return tok
     end
+    if kind(tok) != ENDMARKER && account
+        toklen = tok.endbyte - tok.startbyte + 1
+        ps.allvirtpos += toklen
+    end
+    return tok
 end
 
 function preproc_skip!(ps)
@@ -552,6 +551,38 @@ end
 
 global debug = false
 
+function maybe_macroexpand_formal_arg!(ps::ParseState, tok)
+    # The spec allows formal argument substitution wherever an identifier is
+    # valid, so try to do that now.
+    if kind(tok) == IDENTIFIER && ps.macro_arg_expansion_depth > 0 && length(ps.macrostack[ps.macro_arg_expansion_depth][2].def.formal_args) != 0
+        sym = Symbol(resolve_identifier(ps, active_file(ps), tok))
+        for (i, (;name,)) in enumerate(ps.macrostack[ps.macro_arg_expansion_depth][2].def.formal_args)
+            if name == sym
+                fidx = ps.macro_arg_expansion_depth > 1 ? ps.macrostack[ps.macro_arg_expansion_depth-1][2].def.fidx :
+                    ps.lexer_stack[end][1]
+
+                # Exclude formal argument expansion from the virtrange
+                ps.allvirtpos -= tok.endbyte - tok.startbyte + 1
+
+                # Just treat this the same as a macroexpansion for now
+                push!(ps.macrostack, (tok.startbyte, tok.endbyte)=>MacroScope(MacroDef(
+                    fidx,
+                    ps.macrostack[ps.macro_arg_expansion_depth][2].actual_args[i]
+                )))
+
+                matching = 1
+                while matching > 0 || (ps.macro_arg_expansion_depth != 0 && ps.macrostack[ps.macro_arg_expansion_depth][2].def.is_formal_arg)
+                    matching -= (ps.macrostack[ps.macro_arg_expansion_depth][2].def.is_formal_arg ? -1 : 1)
+                    ps.macro_arg_expansion_depth -= 1
+                end
+
+                return true
+            end
+        end
+    end
+    return false
+end
+
 function next(ps::ParseState)
     #  shift old tokens
     ps.lt = ps.t
@@ -579,6 +610,9 @@ function next(ps::ParseState)
                 virtposend, popped[2], npos, popped[1], nothing))
         @goto got_2
     end
+
+    # Check if this needs to be macroexpanded
+    maybe_macroexpand_formal_arg!(ps, tok1) && @goto next_two_tokens
 
 @label next_token
     ps.ntlast, ps.virtposlast = get_next_action_token(ps)
@@ -709,11 +743,9 @@ function next(ps::ParseState)
 
         def = ps.macros[macroname]
 
-        for (m, scope) in ps.macrostack
-            if scope.def == def
-                ps.nt = synthensize_macro_token!(PREPROC_ERR_RECURSIVE_MACRO)
-                @goto next_token
-            end
+        if !isempty(ps.macrostack) && ps.macrostack[end][2].def == def
+            ps.nt = synthensize_macro_token!(PREPROC_ERR_RECURSIVE_MACRO)
+            @goto next_token
         end
 
         expansion_end = cnt.endbyte
@@ -772,9 +804,13 @@ function next(ps::ParseState)
             end
         end
 
-        # Exclude macro expansion from the virtrange
+        # Exclude macro expansion from the virtrange.
+        # N.B.: All tokens after `cnt` were retrieved with accounting off, so
+        # we do not need to adjust for them here.
         ps.allvirtpos -= cnt.endbyte - nt2.startbyte + 1
         push!(ps.macrostack, (nt2.startbyte, expansion_end)=>MacroScope(def, actual_args))
+        ps.macro_arg_expansion_depth = length(ps.macrostack)
+
         @goto next_two_tokens
     end
 
@@ -782,25 +818,7 @@ function next(ps::ParseState)
 
     # The spec allows formal argument substitution wherever an identifier is
     # valid, so try to do that now.
-    if kind(ps.ntlast) == IDENTIFIER && length(ps.macrostack) != 0 && length(ps.macrostack[end][2].def.formal_args) != 0
-        sym = Symbol(resolve_identifier(ps, active_file(ps), ps.ntlast))
-        for (i, (;name,)) in enumerate(ps.macrostack[end][2].def.formal_args)
-            if name == sym
-                fidx = length(ps.macrostack) > 1 ? ps.macrostack[end-1][2].def.fidx :
-                    ps.lexer_stack[end][1]
-                # Exclude formal argument expansion from the virtrange
-                ps.allvirtpos -= ps.ntlast.endbyte - ps.ntlast.startbyte + 1
-
-                # Just treat this the same as a macroexpansion for now
-                push!(ps.macrostack, (ps.ntlast.startbyte, ps.ntlast.endbyte)=>MacroScope(MacroDef(
-                    fidx,
-                    ps.macrostack[end][2].actual_args[i]
-                )))
-                debug = false
-                @goto next_token
-            end
-        end
-    end
+    maybe_macroexpand_formal_arg!(ps, ps.ntlast) && @goto next_token
 
     return ps
 end

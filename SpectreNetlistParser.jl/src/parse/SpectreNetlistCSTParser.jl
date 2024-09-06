@@ -23,7 +23,7 @@ function parse(str::AbstractString; offset=0, kwargs...)
 end
 parsefile(fname::AbstractString; kwargs...) = parse(String(open(read, fname)); fname, kwargs...)
 
-function parse(io::IOBuffer; fname=nothing, start_lang=nothing, enable_julia_escape::Bool=false, implicit_title::Bool=true)
+function parse(io::IOBuffer; fname=nothing, start_lang=nothing, enable_julia_escape::Bool=false, implicit_title::Bool=true, line_offset::Int=0)
     if start_lang === nothing
         start_lang = if fname === nothing
             :spectre
@@ -37,7 +37,7 @@ function parse(io::IOBuffer; fname=nothing, start_lang=nothing, enable_julia_esc
         end
     end
 
-    ps = ParseState(io; fname)
+    ps = ParseState(io; fname, line_offset)
     parse(ps; start_lang, enable_julia_escape, implicit_title)
 end
 
@@ -52,7 +52,7 @@ function parse(ps::ParseState; start_lang, enable_julia_escape::Bool=false, impl
 
     if start_lang == :spice
         seek(ps.srcfile.contents, 0)
-        ps_spice = SPICENetlistParser.SPICENetlistCSTParser.ParseState(ps.srcfile; return_on_language_change=true, enable_julia_escape, implicit_title)
+        ps_spice = SPICENetlistParser.SPICENetlistCSTParser.ParseState(ps.srcfile; return_on_language_change=true, enable_julia_escape, implicit_title, line_offset=ps.line_offset)
         tree_spice = SPICENetlistParser.SPICENetlistCSTParser.parse(ps_spice)
         push!(stmts, tree_spice.expr)
         transition_from_spice!(ps, ps_spice)

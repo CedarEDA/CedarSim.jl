@@ -120,7 +120,7 @@ function var"$simparam"(param, default)
     end
 end
 
-var"$temperature"() = CedarSim.undefault(CedarSim.spec[].temp)+273.15 # Kelvin
+var"$temperature"() = CedarSim.undefault(CedarSim.options[].temp)+273.15 # Kelvin
 
 abstract type VAModel <: CedarSim.CircuitElement; end
 

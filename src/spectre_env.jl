@@ -203,6 +203,136 @@ const tran = :tran
 export resistor, capacitor, inductor, vsource, isource, bsource, vcvs, vccs, UnimplementedDevice,
     M_1_PI, dc, ac, tran, pwl, pulse, spsin, var"$time", Gnd, agauss, temper
 
+var"$scale"() = CedarSim.undefault(CedarSim.options[].scale)
+
 end # baremodule SpectreEnvironment
+
+struct BinnedModel{B<:Tuple}
+    scale::Float64
+    bins::B
+    BinnedModel(scale, bins::B) where B = new{B}(float(scale), bins)
+end
+
+const ParsedNT = NamedTuple{names, types} where {names, types<:Tuple{Vararg{Union{DefaultOr{Int}, DefaultOr{Float64}, DefaultOr{Bool}}}}}
+struct ParsedModel{T}
+    model::T
+end
+function ParsedModel(model, kwargs)
+    ParsedModel{model}(model(;kwargs...))
+end
+
+Base.show(io::IO, m::ParsedModel) = print(io, "ParsedModel($(m.model), ...)")
+Base.nameof(m::ParsedModel{T}) where T = nameof(T)
+Base.nameof(m::BinnedModel) = nameof(first(m.bins))
+
+modelfields(m) = ()
+modelfields(m::DataType) = fieldnames(m)
+modelfields(::Type{ParsedModel{T}}) where T = modelfields(T)
+modelfields(::Type{BinnedModel{T}}) where T = modelfields(eltype(T))
+
+Base.@assume_effects :foldable function case_adjust_kwargs_fallback(model::Type{T}, kwargs::NamedTuple{Names}) where {Names, T}
+    case_insensitive = Dict(Symbol(lowercase(String(kw))) => kw for kw in fieldnames(T))
+    pairs = Pair[]
+    for kw in (Names::Tuple{Vararg{Symbol}})
+        push!(pairs, get(case_insensitive, Symbol(lowercase(String(kw))), kw)=>getfield(kwargs, kw))
+    end
+    (; pairs...)
+end
+
+function _case_adjust_kwargs(model::Type{T}, kwargs::NamedTuple{Names}) where {Names, T}
+    if @generated
+        case_insensitive = Dict(Symbol(lowercase(String(kw))) => kw for kw in fieldnames(T))
+        return :((;$(map(Names) do kw
+            Expr(:kw,
+                get(case_insensitive, Symbol(lowercase(String(kw))), kw),
+                Expr(:call, :getfield, :kwargs, quot(Symbol(kw))))
+        end...)))
+    else
+        return case_adjust_kwargs_fallback(model, kwargs)
+    end
+end
+
+"""
+    case_adjust_kwargs(model, kwargs)
+
+Adjust the case of `kwargs` (which are assumed to be all lowercase) to match the
+case of the fieldnames of `model`.
+"""
+Base.@assume_effects :total function case_adjust_kwargs(model::Type, kwargs::ParsedNT)
+    #_uppercase_kwargs(model, kwargs)::NamedTuple{<:Any, types}
+    _case_adjust_kwargs(model, kwargs)::ParsedNT
+end
+
+Base.@assume_effects :total function case_adjust_kwargs(model::Type, kwargs::NamedTuple)
+    #_uppercase_kwargs(model, kwargs)::NamedTuple{<:Any, types}
+    _case_adjust_kwargs(model, kwargs)::NamedTuple
+end
+
+function (pm::ParsedModel)(;kwargs...)
+    setproperties(pm.model, values(kwargs))
+end
+
+struct NoBinExpection <: CedarException
+    bm::BinnedModel
+    l::Float64
+    w::Float64
+end
+Base.showerror(io::IO, bin::NoBinExpection) = print(io, "NoBinExpection: no bin for BinnedModel $(typeof(bin.bm)) of size (l=$(bin.l), w=$(bin.w)).")
+
+Base.@assume_effects :consistent :effect_free :terminates_globally @noinline function find_bin(bm::BinnedModel, l, w)
+    l = bm.scale*l
+    w = bm.scale*w
+    for bin in bm.bins
+        (; LMIN, LMAX, WMIN, WMAX) = bin.model
+        if undefault(LMIN::DefaultOr{Float64}) <= l < undefault(LMAX::DefaultOr{Float64}) && undefault(WMIN::DefaultOr{Float64}) <= w < undefault(WMAX::DefaultOr{Float64})
+            return bin
+        end
+    end
+    throw(NoBinExpection(bm, l, w))
+end
+
+function (bm::BinnedModel)(; l, w, kwargs...)
+    find_bin(bm, l, w)(; l, w, kwargs...)
+end
+
+"Instantiate a model using SPICE case insensitive semantics"
+function spicecall(model; m=1.0, kwargs...)
+    ParallelInstances(model(;kwargs...), m)
+end
+
+@Base.assume_effects :foldable function mknondefault_nt(nt::NamedTuple)
+    if @generated
+        names = Base._nt_names(nt)
+        types = Any[]
+        args = Any[]
+        for i = 1:length(names)
+            T = fieldtype(nt, i)
+            arg = :(getfield(nt, $i))
+            if T <: DefaultOr
+                push!(args, arg)
+            else
+                push!(args, Expr(:new, DefaultOr{T}, arg, false))
+                T = DefaultOr{T}
+            end
+            push!(types, T)
+        end
+        nttypes = Tuple{types...}
+        Expr(:new, :(NamedTuple{$names, $nttypes}), args...)
+    else
+        map(mknondefault, nt)
+    end
+end
+
+function spicecall(pm::ParsedModel{T}; m=1, kwargs...) where T
+    instkwargs = case_adjust_kwargs(T, mknondefault_nt(values(kwargs)))::ParsedNT
+    inst = setproperties(pm.model, instkwargs)
+    ParallelInstances(inst, m)
+end
+
+function spicecall(bm::BinnedModel; l, w, kwargs...)
+    spicecall(find_bin(bm, l, w); l, w, kwargs...)
+end
+
+spicecall(::Type{ParsedModel}, model, kwargs) = ParsedModel(model, case_adjust_kwargs(model, kwargs))
 
 export SpectreEnvironment

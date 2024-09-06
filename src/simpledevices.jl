@@ -69,7 +69,7 @@ function (R::SimpleResistor)(A, B; dscope=defaultscope(R))
         undefault(R.r)
     end
     k = 1.380649e-23
-    T = undefault(spec[].temp)+273.15
+    T = VerilogAEnvironment.var"$temperature"()
     pwr = 4*k*T/res
     branch!(dscope, A, B) do V, I
         I - V/res - VerilogAEnvironment.white_noise(dscope, pwr, :thermal)

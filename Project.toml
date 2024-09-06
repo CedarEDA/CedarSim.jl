@@ -1,6 +1,6 @@
 name = "CedarSim"
 uuid = "9075980a-f0c7-46d2-945a-cc5bead5ad4a"
-version = "0.12.0"
+version = "0.11.4"
 authors = ["JuliaHub, Inc. and other contributors"]
 
 [workspace]
@@ -26,6 +26,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicScope = "21d0a5ee-021b-4147-8d5c-120bff51c915"
 ExprTools = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 Lexers = "8fc43420-9e17-4e89-a998-f4e9593a1dfc"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
@@ -83,6 +84,7 @@ DescriptorSystems = "< 1.4.2"
 DynamicScope = "≥ 0.1.2"
 ExprTools = "≥ 0.1.10"
 ForwardDiff = "≥ 0.10.36"
+Graphs = "1.11.2"
 LinearSolve = "2.23.0"
 NonlinearSolve = "3.5.3"
 OrdinaryDiffEq = "6.70.1"

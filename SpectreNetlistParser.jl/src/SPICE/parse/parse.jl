@@ -740,7 +740,6 @@ function parse_hdl(ps, dot)
     return EXPR(HDLStatement(dot, kw, path, nl))
 end
 
-
 function parse_end(ps, dot)
     endd = take_kw(ps, END)
     nl = accept_newline(ps)
@@ -758,6 +757,7 @@ function parse_instance(ps)
         IDENTIFIER_CURRENT_CONTROLLED_VOLTAGE => parse_current_controlled(CCVS, ps)
         IDENTIFIER_BEHAVIORAL => parse_behavioral(ps)
         IDENTIFIER_MOSFET => parse_mosfet(ps)
+        IDENTIFIER_VA_INSTANCE => parse_subckt_call(ps, VAModelCall)
         IDENTIFIER_S_PARAMETER_ELEMENT => parse_s_parameter_element(ps)
         IDENTIFIER_SWITCH => parse_switch(ps)
         IDENTIFIER_DIODE => parse_diode(ps)
@@ -956,7 +956,7 @@ function parse_mosfet(ps)
     return EXPR(MOSFET(name, d, g, s, b, model, parameters, nl))
 end
 
-function parse_subckt_call(ps)
+function parse_subckt_call(ps, T = SubcktCall)
     name = parse_node(ps)
     nodes = EXPRList{NodeName}()
     while kind(nnt(ps)) !== EQ && kind(nt(ps)) !== NEWLINE && kind(nt(ps)) !== JULIA_ESCAPE_BEGIN
@@ -966,7 +966,7 @@ function parse_subckt_call(ps)
     model = pop!(nodes)
     parameters = parse_parameter_list(ps)
     nl = accept_newline(ps)
-    return EXPR(SubcktCall(name, nodes, model, parameters, nl))
+    return EXPR(T(name, nodes, model, parameters, nl))
 end
 
 function parse_s_parameter_element(ps)

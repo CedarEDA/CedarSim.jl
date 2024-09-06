@@ -50,9 +50,11 @@ end
 Base.Symbol(e::Node) = Symbol(String(e))
 
 
+fullspan(n::Node) = n.startof:(n.startof+n.expr.fullwidth-1)
+
 function fullcontents(n::Node)
     buf = IOBuffer()
-    print_vr = n.startof:(n.startof+n.expr.fullwidth-1)
+    print_vr = fullspan(n)
     print_contents(buf, n.ps, first(print_vr), last(print_vr))
     return String(take!(buf))
 end

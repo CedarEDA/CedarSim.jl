@@ -12,15 +12,19 @@ export net, Named
 Base.@kwdef struct SimSpec
     time::Float64=0.0
     ϵω::Float64=0.0
-    temp::DefaultOr{Float64}=mkdefault(27.0)
-    gmin::DefaultOr{Float64}=mkdefault(1e-12)
-    scale::DefaultOr{Float64}=mkdefault(1.0)
     # rng currently breaks incidence analysis
     rng::Union{#=Random.Xoshiro,=# Nothing}=nothing
 end
 
+Base.@kwdef struct SimOptions
+    temp::DefaultOr{Float64}=mkdefault(27.0)
+    gmin::DefaultOr{Float64}=mkdefault(1e-12)
+    scale::DefaultOr{Float64}=mkdefault(1.0)
+end
+
 const debug_scope = ScopedValue{AbstractScope}(DScope())
 const spec = ScopedValue{SimSpec}(SimSpec())
+const options = ScopedValue{SimOptions}(SimOptions())
 const sim_mode = ScopedValue{Symbol}(:dcop)
 
 abstract type AbstractNet end
