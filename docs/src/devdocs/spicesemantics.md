@@ -46,9 +46,9 @@ Consider the following:
 
 ```
 * Callee scoping
-.subckt 1 0 b=1
+.subckt 1 0 r=1
 .param a=2
-r1 1 0
+r1 1 0 r
 .ends
 .param a=3
 x0 1 0 'a'

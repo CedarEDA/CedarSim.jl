@@ -28,11 +28,6 @@ function hasparam(params, name)
     return false
 end
 
-
-function cg_modelref!(state::CodegenState, modelref)
-
-end
-
 function cg_net_name!(state::CodegenState, net)
     return LSymbol(net)
 end
@@ -43,8 +38,8 @@ function cg_net_name!(state::CodegenState, net::Symbol)
     is_ambiguous(state.sema, net) ? Symbol(string("*net#", net)) : net
 end
 
-function cg_model_name!(state::CodegenState, net)
-    return LSymbol(net)
+function cg_model_name!(state::CodegenState, model)
+    return LSymbol(model)
 end
 
 function cg_model_name!(state::CodegenState, model::Symbol)
@@ -262,7 +257,7 @@ function cg_instance!(state::CodegenState, instance::SNode{SP.Resistor})
     if hasparam(instance.params, "l") || hasparam(instance.params, "r")
         model = GlobalRef(SpectreEnvironment, :resistor)
         if instance.val !== nothing
-            model = cg_modelref!(state, modelref)
+            model = cg_model_name!(state, isntance.val)
         end
         return cg_spice_instance!(state, sema_nets(instance), instance.name, model, cg_params!(state, instance.params))
     else

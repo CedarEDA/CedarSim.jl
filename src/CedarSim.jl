@@ -25,7 +25,6 @@ include("ModelLoader.jl")
 include("aliasextract.jl")
 include("netlist_utils.jl")
 include("deprecated.jl")
-#include("circsummary.jl")
 
 import .ModelLoader: load_VA_model
 export load_VA_model

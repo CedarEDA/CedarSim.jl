@@ -129,13 +129,13 @@ function Base.getproperty(ckt::SpCircuit{CktId}, sym::Symbol) where {CktId}
     if ((paramref !== nothing) + (modelref !== nothing) + (subcktref !== nothing) + (instanceref !== nothing)) > 1
         return SpRef(ckt, path, Ambiguous, MultipleKinds(paramref, modelref, subcktref, instanceref, netref))
     elseif paramref !== nothing
-        return SpRef(ckt, (Symbol(paramref[2].name),), Parameter, convert(Pair{UInt64, SNode}, paramref))
+        return SpRef(ckt, (Symbol(paramref[2].val.name),), Parameter, convert(Pair{UInt64, SNode}, paramref))
     elseif modelref !== nothing
-        return SpRef(ckt, (Symbol(modelref[2].name),), Model, convert(Pair{UInt64, SNode}, modelref))
+        return SpRef(ckt, (Symbol(modelref[2].val.name),), Model, convert(Pair{UInt64, SNode}, modelref))
     elseif subcktref !== nothing
-        return SpRef(ckt, (Symbol(subcktref[2].name),), Sbuckt, convert(Pair{UInt64, SNode}, subcktref))
+        return SpRef(ckt, (Symbol(subcktref[2].val.name),), Sbuckt, convert(Pair{UInt64, SNode}, subcktref))
     elseif instanceref !== nothing
-        return SpRef(ckt, (Symbol(instanceref[2].name),), Instance, convert(Pair{UInt64, SNode}, instanceref))
+        return SpRef(ckt, (Symbol(instanceref[2].val.name),), Instance, convert(Pair{UInt64, SNode}, instanceref[1]=>instanceref[2].val))
     else
         throw(FieldError(typeof(ckt), sym))
     end
