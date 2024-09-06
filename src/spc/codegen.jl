@@ -444,12 +444,41 @@ function codegen!(state::CodegenState)
         push!(block.args, :($param = getfield(var"*params#", $(QuoteNode(param)))))
     end
     # Codegen parameter defs
-    for (name, defs) in collect(state.sema.params)[state.sema.parameter_order]
-        def = cg_expr!(state, defs[end][2].val.val)
-        if name in state.sema.formal_parameters
-            push!(block.args, :($name = hasfield(typeof(var"*params#"), $(QuoteNode(name))) ? getfield(var"*params#", $(QuoteNode(name))) : $def))
+    params_in_order = collect(state.sema.params)
+    cond_syms = Vector{Symbol}(undef, length(state.sema.conditionals))
+    for n in state.sema.parameter_order
+        if n <= length(params_in_order)
+            (name, defs) = params_in_order[n]
+            # Lexically later definitions override earlier ones, but only if they
+            # are active.
+            for def in defs
+                cd = def[2]
+                def = cg_expr!(state, cd.val.val)
+                if name in state.sema.formal_parameters
+                    expr = :($name = hasfield(typeof(var"*params#"), $(QuoteNode(name))) ? getfield(var"*params#", $(QuoteNode(name))) : $def)
+                else
+                    expr = :($name = $def)
+                end
+                if cd.cond != 0
+                    cond = cond_syms[abs(cd.cond)]
+                    cd.cond < 0 && (cond = :(!$cond))
+                    expr = :($cond && $expr)
+                end
+                push!(block.args, expr)
+            end
         else
-            push!(block.args, :($name = $def))
+            cond_idx = n - length(params_in_order)
+            _, cd = state.sema.conditionals[cond_idx]
+            s = cond_syms[cond_idx] = gensym()
+            expr = cg_expr!(state, cd.val.body)
+            if cd.cond != 0
+                if cd.cond > 0
+                    expr = :($(cond_syms[cd.cond]) && $expr)
+                else
+                    expr = :($(cond_syms[-cd.cond]) || $expr)
+                end
+            end
+            push!(block.args, :($s = $expr))
         end
     end
     # Implicit and explicit models
@@ -468,10 +497,26 @@ function codegen!(state::CodegenState)
         name = cg_model_name!(state, name)
         push!(block.args, :($name = $(CedarSim.BinnedModel)($(GlobalRef(SpectreEnvironment, :var"$scale"))(), ($(this_bins...),))))
     end
-    for (_, (global_pos, instance)) in state.sema.instances
-        instance = instance.val
-        push!(block.args, LineNumberNode(instance))
-        push!(block.args, cg_instance!(state::CodegenState, instance))
+    for (name, instances) in state.sema.instances
+        if length(instances) == 1 && only(instances)[2].cond == 0
+            (_, instance) = only(instances)
+            instance = instance.val
+            push!(block.args, LineNumberNode(instance))
+            push!(block.args, cg_instance!(state, instance))
+        else
+            counter = gensym()
+            push!(block.args, :($counter = 0))
+            for (_, instance) in instances
+                cond = cond_syms[abs(instance.cond)]
+                instance.cond < 0 && (cond = :(!$cond))
+                push!(block.args, Expr(:if, cond, Expr(:block,
+                    LineNumberNode(instance.val),
+                    cg_instance!(state, instance.val),
+                    :($counter += 1)
+                )))
+            end
+            push!(block.args, :($counter > 1 && error($("Multiple simultaneously active instances of $name"))))
+        end
     end
     return ret
 end

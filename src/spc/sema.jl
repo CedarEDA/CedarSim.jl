@@ -11,6 +11,7 @@ end
 Base.convert(::Type{MaybeConditional{T}}, x::T) where T = MaybeConditional{T}(0, x)
 Base.convert(::Type{MaybeConditional{SNode}}, x::SNode) = MaybeConditional{SNode}(0, x)
 Base.convert(::Type{MaybeConditional{Pair{SNode, GlobalRef}}}, x::Pair{<:SNode, GlobalRef}) = MaybeConditional{Pair{SNode, GlobalRef}}(0, x)
+Base.convert(::Type{MaybeConditional{T}}, x::MaybeConditional) where {T} = MaybeConditional{T}(x.cond, convert(T, x.val))
 
 @enum CircuitKind begin
     SPICECircuit
@@ -44,7 +45,7 @@ mutable struct SemaResult
     libs::Dict{Symbol, Vector{Union{Pair{UInt, SemaSpec}, Pair{UInt, SemaResult}}}}
     options::Dict{Symbol, Vector{Pair{UInt, SNode}}}
 
-    instances::OrderedDict{Symbol, Pair{UInt, MaybeConditional{SNode}}}
+    instances::OrderedDict{Symbol, Vector{Pair{UInt, MaybeConditional{SNode}}}}
     hdl_includes::Vector{Pair{UInt, Pair{SNode, VANode}}}
 
     warnings::Vector
@@ -71,6 +72,15 @@ function SemaResult(ast::SNode)
         OrderedSet{Symbol}(),
         Int[], Module[], nothing)
 end
+
+function MaybeConditional(scope::SemaResult, stmt)
+    MaybeConditional(isempty(scope.condition_stack) ? 0 : scope.condition_stack[end], stmt)
+end
+
+function offset_cd(cd::MaybeConditional{T}, offset) where {T}
+    MaybeConditional{T}(cd.cond == 0 ? 0 : cd.cond + offset, cd.val)
+end
+offset_cd(cd::Pair{UInt, <:MaybeConditional}, offset) = cd[1]=>offset_cd(cd[2], offset)
 
 function SemaSpec(scope::SemaResult, ast::SNode)
     SemaSpec(ast, scope.imps, scope.parse_cache, scope.imported_hdl_modules)
@@ -154,6 +164,11 @@ function sema_visit_ids!(f, cs::SNode{SP.Parameter})
     # TODO: Lot/Dev?
     sema_visit_ids!(f, cs.val)
 end
+
+function sema_visit_ids!(f, cs::SNode{SP.Condition})
+    sema_visit_ids!(f, cs.body)
+end
+
 
 sema_visit_ids!(f, expr::Union{SNode{SP.NumericValue}, SNode{SC.NumericValue}}) = nothing
 sema_visit_ids!(f, ::Nothing) = nothing
@@ -294,7 +309,7 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
             if haskey(scope.instances, name) && isempty(scope.condition_stack)
                 error("Duplicate instance name $name")
             end
-            scope.instances[name] = scope.global_position=>stmt
+            push!(get!(()->[], scope.instances, name), scope.global_position=>MaybeConditional(scope, stmt))
             for net in sema_nets(stmt)
                 push!(get!(()->[], scope.nets, LSymbol(net)), scope.global_position=>net)
             end
@@ -319,13 +334,16 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
                 end
             end
         elseif isa(stmt, SNode{SP.Model})
+            if !isempty(scope.condition_stack)
+                error("Model statements not allowed in conditional blocks. If you need this feature, please file an issue.")
+            end
             sema_visit_model!(scope, stmt)
         elseif isa(stmt, SNode{SP.Subckt})
             name = LSymbol(stmt.name)
             if haskey(scope.subckts, name)
                 warn!(scope, "Duplicate subcircuit definition $name")
             end
-            push!(get!(()->[], scope.subckts, name), scope.global_position=>sema_file_or_section(stmt; imps=scope.imps, parse_cache=scope.parse_cache, imported_hdl_modules=scope.imported_hdl_modules))
+            push!(get!(()->[], scope.subckts, name), scope.global_position=>MaybeConditional(scope, sema_file_or_section(stmt; imps=scope.imps, parse_cache=scope.parse_cache, imported_hdl_modules=scope.imported_hdl_modules)))
         elseif isa(stmt, SNode{SP.LibStatement})
             name = LSymbol(stmt.name)
             if haskey(scope.subckts, name)
@@ -341,10 +359,13 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
         elseif isa(stmt, SNode{SP.ParamStatement})
             for param in stmt.params
                 name = LSymbol(param.name)
-                push!(get!(()->[], scope.params, name), scope.global_position=>param)
+                push!(get!(()->[], scope.params, name), scope.global_position=>MaybeConditional(scope, param))
                 sema_visit_expr!(scope, param.val)
             end
         elseif isa(stmt, SNode{SP.IncludeStatement}) || isa(stmt, SNode{SP.LibInclude}) || isa(stmt, SNode{SP.HDLStatement})
+            if !isempty(scope.condition_stack)
+                error("Includes not allowed in conditional blocks. If you need this feature, please file an issue.")
+            end
             str = strip(unescape_string(String(stmt.path)), ['"', '\'']) # verify??
             if startswith(str, JLPATH_PREFIX)
                 path = str[sizeof(JLPATH_PREFIX)+1:end]
@@ -402,7 +423,7 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
                 if case.condition === nothing
                     sema!(scope, case)
                 else
-                    push!(scope.conditionals, scope.global_position=>case.condition)
+                    push!(scope.conditionals, scope.global_position=>MaybeConditional(scope, case.condition))
                     cond_id = length(scope.conditionals)
                     push!(scope.condition_stack, cond_id)
                     sema!(scope, case)
@@ -418,17 +439,32 @@ function sema!(scope::SemaResult, n::Union{SNode{SPICENetlistSource}, SNode{SP.S
 end
 
 function sema_include!(scope::SemaResult, includee::SemaResult)
+    @assert isempty(scope.condition_stack)
+    condition_offset = length(scope.conditionals)
+    append!(scope.conditionals, includee.conditionals)
     for (name, defs) in includee.params
-        push!(get!(()->[], scope.params, name), defs...)
+        namedefs = get!(()->[], scope.params, name)
+        for def in defs
+            push!(namedefs, offset_cd(def, condition_offset))
+        end
     end
     for (name, defs) in includee.models
-        push!(get!(()->[], scope.models, name), defs...)
+        namedefs = get!(()->[], scope.models, name)
+        for def in defs
+            push!(namedefs, offset_cd(def, condition_offset))
+        end
     end
     for (name, defs) in includee.subckts
-        push!(get!(()->[], scope.subckts, name), defs...)
+        namedefs = get!(()->[], scope.subckts, name)
+        for def in defs
+            push!(namedefs, offset_cd(def, condition_offset))
+        end
     end
     for (name, defs) in includee.instances
-        push!(get!(()->[], scope.instances, name), defs...)
+        namedefs = get!(()->[], scope.instances, name)
+        for def in defs
+            push!(namedefs, offset_cd(def, condition_offset))
+        end
     end
     for (name, defs) in includee.libs
         push!(get!(()->[], scope.libs, name), defs...)
@@ -516,22 +552,25 @@ function resolve_scopes!(sr::SemaResult)
 
     # Go through all subcircuit instances, figure out the appropriate definition,
     # and add all implicit parameters/models/subckts to the exposed lists.
-    for (_, (_, instance)) in sr.instances
-        if isa(instance, SNode{SP.SubcktCall})
-            subckt = get(sr.subckts, LSymbol(instance.model), nothing)
-            if subckt === nothing
-                continue
-            end
-            subckt = subckt[end][2]
-            for name in subckt.exposed_parameters
-                push!(sr.exposed_parameters, name)
-            end
-            for name in subckt.exposed_models
-                push!(sr.exposed_models, name)
-            end
-            # TODO: If a subcircuit is resolved, add its parameters
-            for name in subckt.exposed_subckts
-                push!(sr.exposed_subckts, name)
+    for (_, instances) in sr.instances
+        for (_, instance) in instances
+            instance = instance.val
+            if isa(instance, SNode{SP.SubcktCall})
+                subckt = get(sr.subckts, LSymbol(instance.model), nothing)
+                if subckt === nothing
+                    continue
+                end
+                subckt = subckt[end][2].val
+                for name in subckt.exposed_parameters
+                    push!(sr.exposed_parameters, name)
+                end
+                for name in subckt.exposed_models
+                    push!(sr.exposed_models, name)
+                end
+                # TODO: If a subcircuit is resolved, add its parameters
+                for name in subckt.exposed_subckts
+                    push!(sr.exposed_subckts, name)
+                end
             end
         end
     end
@@ -539,11 +578,16 @@ function resolve_scopes!(sr::SemaResult)
     # Now that we know all the parameters that we need, topologically sort them
     # with our known definitions, both for codegen and to be able to diagnose
     # any cycles.
-    graph = SimpleDiGraph(length(sr.params)); # vertices are symbol ids in params
+    graph = SimpleDiGraph(length(sr.params) + length(sr.conditionals)); # vertices are symbol ids in [params; conditionals]
     idx_lookup = Dict{Symbol, Int}(sym=>id for (id, (sym, _)) in enumerate(sr.params))
+    conditional(idx) = length(sr.params) + abs(idx)
     for (n, (name, defs)) in enumerate(sr.params)
         def = defs[end]
-        sema_visit_ids!(def[2].val.val) do name
+        cd = def[2]
+        if cd.cond != 0
+            add_edge!(graph, conditional(cd.cond), n)
+        end
+        sema_visit_ids!(cd.val.val) do name
             push!(sr.exposed_parameters, name)
             if haskey(idx_lookup, name)
                 m = idx_lookup[name]
@@ -551,6 +595,19 @@ function resolve_scopes!(sr::SemaResult)
                     # Self-parameter reference refers to outer scope
                     add_edge!(graph, idx_lookup[name], n)
                 end
+            end
+        end
+    end
+
+    for (n, (_, cd)) in enumerate(sr.conditionals)
+        if cd.cond != 0
+            add_edge!(graph, conditional(cd.cond), conditional(n))
+        end
+        sema_visit_ids!(cd.val) do name
+            push!(sr.exposed_parameters, name)
+            if haskey(idx_lookup, name)
+                m = idx_lookup[name]
+                add_edge!(graph, m, conditional(n))
             end
         end
     end
